@@ -714,8 +714,17 @@ export default function DurinnGame({ hot }) {
     window.addEventListener("pointerdown", lock, { once: true });
     return () => { window.removeEventListener("resize", chk); window.removeEventListener("orientationchange", chk); window.removeEventListener("pointerdown", lock); };
   }, []);
+  /* the rotate prompt clears itself after 5 seconds (a stale size report or a locked rotation must never block play);
+     it can show again once the device has been landscape and then goes upright again */
+  const [rotateGone, setRotateGone] = useState(false);
+  useEffect(() => {
+    if (!tall) { setRotateGone(false); return undefined; }
+    const t = setTimeout(() => setRotateGone(true), 5000);
+    return () => clearTimeout(t);
+  }, [tall]);
+  const showRotate = tall && !rotateGone;
   const [, setVer] = useState(0);
-  useEffect(() => { if (engRef.current && engRef.current.setPaused) engRef.current.setPaused(tall); }, [tall, screen]);
+  useEffect(() => { if (engRef.current && engRef.current.setPaused) engRef.current.setPaused(showRotate); }, [showRotate, screen]);
   const bump = useCallback(() => setVer((v) => v + 1), []);
   useEffect(() => { loadChibi(); onChibiReady(bump); }, []);
   const [settings, setSettings] = useState(loadSettings);
@@ -1280,7 +1289,7 @@ export default function DurinnGame({ hot }) {
     <div className="dz-root" ref={rootRef}>
       <style>{CSS}</style>
       <canvas className="dz-canvas" ref={canvasRef} aria-label="Oakhaven" />
-      {tall ? (
+      {showRotate ? (
         <div className="dz-rotate" role="alert">
           <div className="dz-rphone" aria-hidden="true" />
           <h2>Turn your device sideways</h2>
