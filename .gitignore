@@ -1,0 +1,15 @@
+node_modules/
+build/
+dist/
+src/DurinnGame.jsx
+# raw purchased/downloaded asset packs: never commit (see docs/CREDITS.md)
+assets/
+# test and tool output
+test/**/*.png
+test/**/*.gif
+test/dev/report.json
+tools/bake/**/*.png
+tools/bake/**/*.json
+__pycache__/
+*.pyc
+.DS_Store

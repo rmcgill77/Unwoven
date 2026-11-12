@@ -1,0 +1,23 @@
+{
+  "name": "unwoven",
+  "version": "0.1.0-act1",
+  "private": true,
+  "description": "Unwoven: A Tale of Talvora. A mobile-first pixel RPG with ATB battles and Old Tongue word magic.",
+  "scripts": {
+    "build": "node scripts/build.cjs",
+    "build:dev": "node scripts/build.cjs --dev",
+    "serve": "npx --yes http-server dist -p 8080 -c-1",
+    "test": "bash test/runall.sh",
+    "test:reach": "python3 test/reach_check.py",
+    "test:devices": "python3 test/devices.py",
+    "sim": "node -e \"require('./test/sim/sim.cjs')\""
+  },
+  "dependencies": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.10"
+  },
+  "license": "UNLICENSED"
+}
