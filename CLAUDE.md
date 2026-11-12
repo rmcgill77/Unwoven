@@ -16,7 +16,7 @@ Read `README.md` for build, test and release. This file covers how the game is p
   - Nothing walks *away* from the camera with an animation; that direction is drawn side-on.
   - Walking toward the camera is animated.
   - Idle characters keep the direction they were walking.
-- **Screens:** landscape only, and it must work on phones, the Galaxy Z Fold 7 closed and open, tablets and monitors. A phone held upright gets a "turn your device" screen. The open Fold is near-square and plays either way.
+- **Screens:** landscape only, and it must work on phones, the Galaxy Z Fold 7 closed and open, tablets and monitors. There is no "turn your device" screen or pause: the game never blocks on screen shape (removed at Ryan's request after a tester got stuck on it). The open Fold is near-square and plays either way.
 - **World and lore:**
   - Wolves appear only in the woods, the rocks and the caves, never in town.
   - The overworld is a hybrid: a travel map plus walkable scenes.

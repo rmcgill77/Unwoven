@@ -225,10 +225,6 @@ const CSS = `
 @media (max-width:620px){.dz-create{grid-template-columns:1fr}.dz-preview{border-right:none;border-bottom:2px solid var(--edge);grid-template-columns:auto 1fr;align-items:center;justify-items:start}}
 @media (max-height:430px){.dz-portrait{width:96px;height:96px}.dz-text{font-size:15px}.dz-logo{font-size:34px}.dz-tcard{gap:10px;padding:14px 18px}}
 .dz-root>:not(canvas):not(style):not(.dz-battle):not(.dz-splash):not(.dz-fps):not(.dz-ctl){zoom:var(--uiz,1)}.dz-battle .dz-bpanel,.dz-battle .dz-btop{zoom:var(--uiz,1)}
-.dz-rotate{position:absolute;inset:0;z-index:99;background:var(--ink);display:grid;place-content:center;justify-items:center;gap:18px;text-align:center;padding:24px;color:var(--text)}
-.dz-rotate h2{margin:0;font-size:24px;letter-spacing:1px}.dz-rotate p{margin:0;max-width:300px;color:var(--muted);font-size:16px;line-height:1.35}
-.dz-rphone{width:54px;height:92px;border:4px solid var(--parch);border-radius:8px;position:relative;animation:dzrot 2.6s ease-in-out infinite;box-shadow:0 0 0 2px var(--edge)}
-.dz-rphone::after{content:"";position:absolute;left:50%;bottom:6px;width:14px;height:3px;margin-left:-7px;background:var(--parch);opacity:.6}
 /* foldables: Z Fold cover screen is very wide and short, the open screen is nearly square */
 @media (max-height:430px) and (min-aspect-ratio:3/2){
 .dz-tome{grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);align-items:start;gap:10px 14px}
@@ -255,8 +251,6 @@ const CSS = `
 .dz-die[data-held="1"]{transform:translateY(-5px);outline:3px solid var(--ley)}.dz-die-hold{position:absolute;left:0;right:0;bottom:-17px;font-size:9px;letter-spacing:.12em;color:var(--ley)}
 .dz-dres{margin:0;font-size:15px;color:var(--parch)}.dz-dres[data-out="lose"]{color:var(--bad)}.dz-dres i{display:block;font-size:13px;color:var(--muted);margin-top:2px}
 @media (max-height:430px){.dz-die{width:44px;height:44px;padding:6px}.dz-dicerow{gap:12px;padding:2px 0 12px}.dz-dbody{padding:6px 12px 10px;gap:4px}.dz-drules{font-size:12px}}
-@keyframes dzrot{0%,25%{transform:rotate(0)}55%,80%{transform:rotate(-90deg)}100%{transform:rotate(0)}}
-@media (prefers-reduced-motion:reduce){.dz-rphone{animation:none;transform:rotate(-90deg)}}
 @media (max-width:1000px) and (min-width:621px){.dz-dialog{width:calc(100% - 330px);left:calc(50% - 6px)}}
 @media (max-height:440px){.dz-preview{padding:8px;gap:4px}.dz-preview .dz-wspr{display:none}.dz-preview .dz-portrait{width:112px!important;height:112px!important}.dz-wspr{display:none}.dz-pname{font-size:15px}.dz-ptrade{font-size:12px}.dz-create{grid-template-columns:minmax(150px,190px) 1fr}}
 @media (prefers-reduced-motion:reduce){.dz-more{animation:none}.dz-bar>i{transition:none}}
@@ -706,25 +700,13 @@ export default function DurinnGame({ hot }) {
     const fit = () => { const r = rootRef.current; if (!r) return; const z = Math.max(1, Math.min(2.2, Math.min(window.innerWidth / 1100, window.innerHeight / 620))); r.style.setProperty("--uiz", z < 1.06 ? 1 : +z.toFixed(3)); };
     fit(); window.addEventListener("resize", fit); return () => window.removeEventListener("resize", fit);
   }, []);
-  const [tall, setTall] = useState(() => window.innerHeight > window.innerWidth * 1.15);
+  /* no rotate prompt: the game never blocks or pauses on screen shape. This only asks the browser to hold landscape where it allows it. */
   useEffect(() => {
-    const chk = () => setTall(window.innerHeight > window.innerWidth * 1.15);
-    window.addEventListener("resize", chk); window.addEventListener("orientationchange", chk);
     const lock = () => { try { const o = window.screen && window.screen.orientation; if (o && o.lock) o.lock("landscape").catch(() => {}); } catch (e) { /* needs fullscreen on most browsers */ } };
     window.addEventListener("pointerdown", lock, { once: true });
-    return () => { window.removeEventListener("resize", chk); window.removeEventListener("orientationchange", chk); window.removeEventListener("pointerdown", lock); };
+    return () => window.removeEventListener("pointerdown", lock);
   }, []);
-  /* the rotate prompt clears itself after 5 seconds (a stale size report or a locked rotation must never block play);
-     it can show again once the device has been landscape and then goes upright again */
-  const [rotateGone, setRotateGone] = useState(false);
-  useEffect(() => {
-    if (!tall) { setRotateGone(false); return undefined; }
-    const t = setTimeout(() => setRotateGone(true), 5000);
-    return () => clearTimeout(t);
-  }, [tall]);
-  const showRotate = tall && !rotateGone;
   const [, setVer] = useState(0);
-  useEffect(() => { if (engRef.current && engRef.current.setPaused) engRef.current.setPaused(showRotate); }, [showRotate, screen]);
   const bump = useCallback(() => setVer((v) => v + 1), []);
   useEffect(() => { loadChibi(); onChibiReady(bump); }, []);
   const [settings, setSettings] = useState(loadSettings);
@@ -1289,13 +1271,6 @@ export default function DurinnGame({ hot }) {
     <div className="dz-root" ref={rootRef}>
       <style>{CSS}</style>
       <canvas className="dz-canvas" ref={canvasRef} aria-label="Oakhaven" />
-      {showRotate ? (
-        <div className="dz-rotate" role="alert">
-          <div className="dz-rphone" aria-hidden="true" />
-          <h2>Turn your device sideways</h2>
-          <p>Unwoven is played in landscape. Your progress is paused and will pick up right where you left it.</p>
-        </div>
-      ) : null}
 
       {screen === "game" ? (
         <div className="dz-hud">
