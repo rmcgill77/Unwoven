@@ -13,3 +13,10 @@ tools/bake/**/*.json
 __pycache__/
 *.pyc
 .DS_Store
+
+# Act 2 test and tool output
+shots2/
+test/t2/shots2/
+tools/concept/**/*.png
+tools/concept/**/*.gif
+tools/envc/**/*.png

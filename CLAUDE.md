@@ -50,6 +50,14 @@ Read `README.md` for build, test and release. This file covers how the game is p
 | `06b_splash.jsx`, `06c_battleart.jsx`, `06i_intro.jsx` | Splash, battle renderer, intro slides |
 | `07_ui.jsx` | Everything React: screens, HUD, dialogue runner, menus, creator, wardrobe, credits |
 
+**Act Two** (same single scope, listed in `PARTS`):
+- `04d_act2.js`: items, merchants, the economy, Pillars as rest points, regrowing pickups and the Act Two state (`act2Ensure`, `act2Kit`).
+- `04e`-`04s`: the wider world, one map file plus a `*_life.js` (NPCs, schedules, scripts) per area: plains, Ashford, west forest, east forest, Greywick, the Outskirts, the fort, then the end of Act Two.
+- `02l`-`02q`: more baked atlases (paving, Ashford chibis, NPC chibis, battle backgrounds, icons, book UI). `02h2`/`06e2`: second foe set and its battle code.
+- `06g2`: gear data. `06j_study.jsx`: the study screen. `06l`/`06m`: Ashford and fort late-game. `06n_audio.js`: sound effects and ambience (files in `public/sfx/`, Act Two tracks in `public/music/a2*.mp3`). `06o_book.jsx`: the Book.
+- `06d_chibi.js` is an unused leftover and is not in the build order.
+- **The handoff:** the Act One finale (`d5_wake` in `04_data.js`) sets `act1_end` and runs `{ act: "credits" }`. The end-of-act card's Continue calls `beginAct2` in `07_ui.jsx`, which sets `flags.act2`, makes the Pillar the rest point and starts the tutorial popup. On load, a save with `act1_end` and no `act2` is stepped into Act Two.
+
 **Maps** are rows of tile characters.
 - **Solid tiles:** `SOLID_TILES` in `04_data.js`.
 - **Common tiles:** `T` tree, `.` and `,` grass, `*` flowers, `b` bush, `r` rock, `=` road, `~` water, `B` bridge, `#` stone wall, `S` sign, `Z` barricade, `P` pillar.
@@ -92,6 +100,8 @@ Read `README.md` for build, test and release. This file covers how the game is p
 - **After changing maps or props,** run `npm run test:reach`. Its expected reports are listed below; anything else is new.
   - The Oakhaven north and south gates are barricades that story flags remove, so it reports the arrivals at (23,1)/(24,1) and the rocks warps.
   - A few objects stand behind an identical, reachable twin: the store shelf and barrel, two crates, and a study shelf.
+- **Act Two tests:** `test/t2/*.js` (Node Playwright; run from a scratch folder with a `shots2/` directory). The core set is `gw os fort act2end ashq ef spar book southroad`. `abilities.js` is stale (it calls `btlFreshMember`, which is not exposed on `window`).
+- `test:reach` also reports Act Two items it has no baseline for: decorative banners, stalls and boards in Ashford with no look text, a few NPC spots on solid tiles (Tam, the Outskirts gate guards, the toll keeper), and unreachable shelves and herbs behind twins.
 - After changing foes or party stats, check `test/sim/sim.cjs`. The Thornmother is tuned so a solo player wins at level 5 with the sword, or level 4 with fire magic.
 
 ## Sprites
@@ -105,5 +115,6 @@ Read `README.md` for build, test and release. This file covers how the game is p
 
 - The town lawn needs a polish pass; ask Ryan what bothers him about it.
 - The audio mix, and how the touch controls feel on real phones and the Fold, haven't been checked on hardware.
-- The game is about 1.6 MB of JS, mostly the baked atlases. The first-load bake takes about 1 second on desktop and is covered by a "Loading" screen.
-- Next up after Act One: the world opens (Ashford and its Weaver outpost), factions, companions, the skeleton creature, and the unused packs (ruins, trees, dungeon, guild hall, roads, weapons, portraits).
+- Most of the JS is baked atlases. The first-load bake takes a moment on desktop and is covered by a "Loading" screen.
+- Acts One and Two are in (`0.2.0-act2`). Next up: Act Three in southern Etharis (the South Road barricade on the plains opens; the unpicked hero joins as a companion), elves in the Ringval Wilds, a grassland tileset, and the remaining unused packs.
+- The game is now about 3.9 MB of JS plus about 21 MB of audio. Known perf from the Act Two notes: about 45-58 fps at 6x CPU throttle; the night lighting pass and the Outskirts tor are the remaining costs.

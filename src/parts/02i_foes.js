@@ -5,7 +5,7 @@ const FOE_FR = {};
   Object.keys(FOE_ATLAS).forEach((k) => {
     const a = FOE_ATLAS[k], im = new Image();
     im.onload = () => {
-      const o = { w: a.cw, h: a.ch }; let i = 0;
+      const o = { w: a.cw, h: a.ch, foot: a.foot || 0 }; let i = 0;
       Object.keys(a.n).forEach((kind) => {
         o[kind] = [];
         for (let j = 0; j < a.n[kind]; j++, i++) { const c = makeCanvas(a.cw, a.ch), x = c.getContext("2d"); x.drawImage(im, i * a.cw, 0, a.cw, a.ch, 0, 0, a.cw, a.ch); o[kind].push(c); }

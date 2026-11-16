@@ -35,6 +35,9 @@ const PROP_DEFS = {
   shroom: { fw: 1, fh: 1, deco: true, look: "shroom", light: { r: 40, c: "#7ad0e0", ox: 8, oy: 6, flicker: true, str: 0.9 } },
   herbpatch: { fw: 1, fh: 1, deco: true, look: "herbpatch" },
   firepit: { fw: 1, fh: 1, look: "firepit" }, leanto: { fw: 2, fh: 1, look: "leanto" }, deadlog: { fw: 2, fh: 1, look: "deadlog" }, bones: { fw: 1, fh: 1, deco: true, look: "bones" },
+  memorial: { fw: 1, fh: 1, look: "memorial" }, frame: { fw: 3, fh: 2, look: "frame" }, timber: { fw: 2, fh: 1, look: "timber" },
+  banner: { fw: 1, fh: 1, frames: 2, look: "banner" }, ubanner: { fw: 1, fh: 1, frames: 2, look: "ubanner" }, stall: { fw: 2, fh: 1, look: "stall" }, tarp: { fw: 2, fh: 1, look: "tarp" },
+  wagon: { fw: 2, fh: 1, look: "wagon" }, sentry: { fw: 1, fh: 1, look: "sentry" }, shrine: { fw: 1, fh: 1, look: "shrine" }, grate: { fw: 1, fh: 1, deco: true, look: "grate" }, dummy: { fw: 1, fh: 1, look: "dummy" },
   lantern: { fw: 1, fh: 1, wall: true, light: { r: 46, c: PAL.ember, ox: 8, oy: 10, flicker: true, str: 0.9 } },
 };
 
@@ -78,7 +81,11 @@ function npcLookFor(id, G) {
       : { skin: 0, hair: 4, hairStyle: "short", cloth: 4, outfit: "coat", mood: "smile", age: true, chibi: "mayor_m" };
   }
   if (id === "player") return G ? G.look : { skin: 1, hair: 1, hairStyle: "short", cloth: 0, outfit: "tunic", strap: true };
-  return NPC_DEFS[id] ? { ...NPC_DEFS[id].look, chibi: CHIBI_MAP[id] || null } : null;
+  if (!NPC_DEFS[id]) return null;
+  // an NPC never borrows the player's sprite: anyone without a set of their own gets a townsperson's, picked by name
+  const pool = typeof NPC_SETS !== "undefined" ? Object.values(NPC_SETS) : [];
+  const fallback = pool.length ? pool[[...id].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) >>> 0, 7) % pool.length] : null;
+  return { ...NPC_DEFS[id].look, chibi: CHIBI_MAP[id] || fallback };
 }
 
 function buildVars(G, hour) {
@@ -182,7 +189,7 @@ function prepareMap(id, def, art, trade) {
     chk(x, y - 1, N); chk(x + 1, y, E); chk(x, y + 1, S); chk(x - 1, y, W);
     return mk;
   };
-  const pathLike = new Set(["=", "P", "B", "D", "Z"]);
+  const pathLike = new Set(["=", "P", "B", "D", "Z", "G", "g"]);
   const waterLike = new Set(["~", "B"]);
   const keys = [], lights = [];
   for (let y = 0; y < h; y++) {
@@ -195,7 +202,7 @@ function prepareMap(id, def, art, trade) {
         case ".": k = art.grass(v, false); break;
         case ",": k = art.grass(v, true); break;
         case "*": k = art.flowers(v); break;
-        case "=": case "P": k = art.path(mask(x, y, (n) => !pathLike.has(n), false), v); break;
+        case "=": case "P": case "G": case "g": k = art.path(mask(x, y, (n) => !pathLike.has(n), false), v); break;
         case "Z": k = art.barricade(v); break;
         case "~": { const mk = mask(x, y, (n) => !waterLike.has(n), false); k = [art.water(mk, 0, v), art.water(mk, 1, v)]; break; }
         case "B": k = art.bridge(mask(x, y, (n) => n !== "B", false)); break;
@@ -234,7 +241,7 @@ function prepareMap(id, def, art, trade) {
     const d = p.def;
     if (d.light) lights.push({ x: p.x * TILE + d.light.ox, y: p.y * TILE + d.light.oy, r: d.light.r, c: d.light.c, flicker: d.light.flicker, night: d.light.night, str: d.light.str });
   }
-  if (def.pillar) lights.push({ x: def.pillar.x, y: 17 * TILE, r: 52, c: PAL.ley, flicker: true, str: 0.85 });
+  for (const pl of pillarList(def)) lights.push({ x: pl.x, y: pl.base - TILE, r: 52, c: PAL.ley, flicker: true, str: 0.85, stutter: def.stutter });
 
   // the grim art pass: one baked ground layer plus high-detail sprites, sharing the cast's pixel density
   const g = bakeGrimMap(id, def, cells, w, h, props, trade);
@@ -547,7 +554,8 @@ function createEngine(canvas, root, hooks) {
     if (n) return { kind: "npc", id: n.id, x: n.x, y: n.y - 44 };
     const tx = Math.floor(px / TILE), ty = Math.floor(py / TILE);
     const c = m.at(tx, ty);
-    const prop = m.propAt.get(`${tx},${ty}`);
+    let prop = m.propAt.get(`${tx},${ty}`);
+    if (prop && propGone(s.G, prop)) prop = null;   // picked and not yet grown back
     const mark = (o, x, y) => ({ ...o, x, y });
     if (prop) {
       const top = prop.y * TILE + (prop.def.dy || 0) - 2;
@@ -580,8 +588,11 @@ function createEngine(canvas, root, hooks) {
     }
     if (c === "D" && !m.warpAt.has(`${tx},${ty}`)) return { kind: "look", key: "door", x: tx * TILE + 8, y: ty * TILE - 4 };
     if (c === "S") return { kind: "sign", key: `${tx},${ty}`, x: tx * TILE + 8, y: ty * TILE - 4 };
-    if (c === "P") return { kind: "look", key: "pillar", x: m.def.pillar.x, y: 18 * TILE - 50 };
+    if (c === "P") { const pl = nearestPillar(m.def, tx * TILE + 8, ty * TILE + 8); if (pl) return { kind: "look", key: "pillar:" + pl.id, x: pl.x, y: pl.base - 50 }; }
+    if (c === "g") return { kind: "look", key: "gate", x: tx * TILE + 8, y: ty * TILE - 2 };
     if (c === "Z") return { kind: "look", key: "barricade", x: tx * TILE + 8, y: ty * TILE - 2 };
+    if (c === "H") return { kind: "look", key: ty < 25 ? "northgate" : "southgate", x: tx * TILE + 8, y: ty * TILE - 2 };
+    if (c === "F") return { kind: "look", key: "fortwall", x: tx * TILE + 8, y: ty * TILE - 2 };
     if (c === "c") {
       if (s.G && TRADES[s.G.trade].fieldStation) return { kind: "station", x: tx * TILE + 8, y: ty * TILE - 2 };
       return { kind: "look", key: "crops", x: tx * TILE + 8, y: ty * TILE - 2 };
@@ -613,7 +624,7 @@ function createEngine(canvas, root, hooks) {
     const w = Math.max(1, Math.round(src.width * sc)), h = Math.max(1, Math.round(src.height * sc)), c = makeCanvas(w, h), x = c.getContext("2d"); x.imageSmoothingEnabled = false;
     if (flip) { x.translate(w, 0); x.scale(-1, 1); } x.drawImage(src, 0, 0, w, h); m[k] = c; return c;
   }
-  const inPillar = (x, y, pad = 0) => { const pl = s.map && s.map.def.pillar; return !!pl && Math.hypot(x - pl.x, y - (pl.y - 8)) < pl.r * TILE + pad; };
+  const inPillar = (x, y, pad = 0) => !!s.map && pillarList(s.map.def).some((pl) => Math.hypot(x - pl.x, y - (pl.y - 8)) < pl.r * TILE + pad);
   function spawnWolves() {
     s.wolves = []; s.encounter = null; spawnCritters();
     const wd = s.map && s.map.def.wild;
@@ -623,8 +634,8 @@ function createEngine(canvas, root, hooks) {
     const all = [...wd, ...((night && s.map.def.wildNight) || [])];
     all.forEach((g, i) => {
       const key = s.mapId + ":" + i;
-      if (s.G.slain[key] === s.G.day) return;
-      s.wolves.push({ key, group: g.group, x: g.x * TILE + 8, y: g.y * TILE + 8, hx: g.x * TILE + 8, hy: g.y * TILE + 8, dir: "left", anim: Math.random() * 6, tx: null, ty: null, wt: Math.random() * 2, stun: 0, alert: 0, chase: false, root: g.group.some((k) => BTL_FOES[k] && BTL_FOES[k].rooted), big: g.group.some((k) => BTL_FOES[k] && BTL_FOES[k].boss) });
+      if (isSlain(s.G, key) || !wildAllowed(g, night) || (g.need && !s.G.flags[g.need]) || (g.unless && s.G.flags[g.unless])) return;   // some things only walk by day, some only after dark
+      s.wolves.push({ key, group: g.group, x: g.x * TILE + 8, y: g.y * TILE + 8, hx: g.x * TILE + 8, hy: g.y * TILE + 8, anim: Math.random() * 6, tx: null, ty: null, wt: Math.random() * 2, stun: 0, alert: 0, chase: false, root: g.group.some((k) => BTL_FOES[k] && BTL_FOES[k].rooted && !BTL_FOES[k].art.startsWith("snap")), big: g.group.some((k) => BTL_FOES[k] && BTL_FOES[k].boss), statue: !!g.statue, dir: g.face || "left" });
     });
   }
   function wolfMove(w, dx, dy) {
@@ -684,6 +695,7 @@ function createEngine(canvas, root, hooks) {
     const p = s.player, safe = inPillar(p.x, p.y) || (!s.map.def.outside && !s.map.def.cave);
     const busy = s.blocked || !!s.fade || !!s.encounter;
     for (const w of s.wolves) {
+      if (w.statue) continue;   // dormant things only stand there, rusting
       w.anim += dt * (w.chase ? 9 : 3);
       if (w.stun > 0) { w.stun -= dt; w.chase = false; const dx = w.hx - w.x, dy = w.hy - w.y, d = Math.hypot(dx, dy); if (d > 3) { wolfMove(w, (dx / d) * 24 * dt, (dy / d) * 24 * dt); w.dir = dx > 0 ? "right" : "left"; } continue; }
       const dx = p.x - w.x, dy = p.y - w.y, d = Math.hypot(dx, dy);
@@ -766,7 +778,12 @@ function createEngine(canvas, root, hooks) {
         moveAxis("y", (iy / len) * spd * dt);
         p.anim += dt * 8 * Math.max(0.6, mag);
         const wp = s.map.warpAt.get(`${Math.floor(p.x / TILE)},${Math.floor(p.y / TILE)}`);
-        if (wp && s.mapId === "shop" && s.G && !s.G.flags.wardrobe_done && !s.fade) {   // the first time out of the door: not before the mirror
+        const L = wp && wp.lock, barred = L && s.G && ((L.night && isNightT(s.G.time)) || (L.need && !s.G.flags[L.need]) || (L.flag && s.G.flags[L.flag] && !s.G.flags[L.unless]));
+        const barSay = barred && (L.night && isNightT(s.G.time) ? L.sayNight || L.say : L.say);
+        if (barred && !s.fade) {   // a gate shut from the other side: step back, and hear why
+          const [vx, vy] = DIR_VEC[wp.dir] || [0, 0]; p.x = (wp.x - vx) * TILE + 8; p.y = (wp.y - vy) * TILE + 12; p.moving = false;
+          if (!s.barredT || s.t - s.barredT > 1.5) { s.barredT = s.t; hooks.onWarpBlocked && hooks.onWarpBlocked(barSay); }
+        } else if (wp && s.mapId === "shop" && s.G && !s.G.flags.wardrobe_done && !s.fade) {   // the first time out of the door: not before the mirror
           p.y = (wp.y - 1) * TILE + 12; p.moving = false; hooks.onWarpBlocked && hooks.onWarpBlocked();
         } else if (wp && !s.fade) {
           fadeTo(() => { loadMap(wp.to, wp.tx, wp.ty, wp.dir); hooks.onEnterMap && hooks.onEnterMap(wp.to); });
@@ -819,7 +836,7 @@ function createEngine(canvas, root, hooks) {
   function leylineReading() {
     const m = s.map;
     if (!m.def.outside) return { wild: false, value: 0.3, label: "Calm, indoors" };
-    const p = s.player, pl = m.def.pillar;
+    const p = s.player, pl = nearestPillar(m.def, s.player.x, s.player.y);
     if (!pl) {   // deep wood: no Pillar for miles, and the leyline surges like a struck flint
       const surge = Math.sin(s.t * 3.1) * Math.sin(s.t * 1.3) * 0.2;
       return { wild: true, value: Math.max(0.45, Math.min(1, 0.78 + surge)), label: "Wild, surging" };
@@ -935,9 +952,9 @@ function createEngine(canvas, root, hooks) {
       if (w.x < cx - 40 || w.x > cx + w_ + 40 || w.y < cy - 40 || w.y > cy + h_ + 40) continue;
       const fa = FOE_FR[(BTL_FOES[w.group[0]] || {}).art];
       if (fa) {
-        const kind = w.chase && w.alert <= 0 ? "attack" : "idle", arr = fa[kind], f0 = arr[Math.floor(w.anim * (w.chase ? 1.5 : 0.8)) % arr.length], sc = ((BTL_FOES[w.group[0]].art || "").indexOf("wolf") === 0 ? 0.65 : fa.h > 50 ? 0.5 : 0.62) * (w.root ? 2.3 : w.big ? 1.25 : 1);
+        const kind = w.chase && w.alert <= 0 ? "attack" : "idle", arr = fa[kind], f0 = w.statue ? (fa.stun ? fa.stun[fa.stun.length - 1] : fa.idle[fa.idle.length - 1]) : arr[Math.floor(w.anim * (w.chase ? 1.5 : 0.8)) % arr.length], sc = HUMAN_ART.has(BTL_FOES[w.group[0]].art) ? WORLD_CHIBI_K : ((BTL_FOES[w.group[0]].art || "").indexOf("wolf") === 0 ? 0.65 : fa.h > 50 ? 0.5 : 0.62) * (w.root ? 2.3 : w.big ? 1.25 : 1);
         const wc = worldFoe(f0, sc, w.dir === "right"), bob = w.chase ? Math.abs(Math.sin(w.anim)) * 1.2 : 0;
-        ents.push({ chibi: true, img: wc, ax: Math.round(wc.width / 2), ay: wc.height - 2 + Math.round(bob), x: w.x, y: w.y, sortY: w.y, wolf: w });
+        ents.push({ chibi: true, img: wc, ax: Math.round(wc.width / 2), ay: wc.height - 2 - Math.round((fa.foot || 0) * sc) + Math.round(bob), x: w.x, y: w.y, sortY: w.y, wolf: w });
         continue;
       }
       const art_ = worldWolf(0, w.big), fr = (w.dir === "right" ? art_.r : art_.l)[w.chase && w.alert <= 0 && Math.floor(w.anim) % 2 ? 1 : 0];
@@ -951,10 +968,19 @@ function createEngine(canvas, root, hooks) {
 
     const list = [];
     for (const t of m.talls) {
-      const img = t.frames ? t.frames[ff] : t.lit ? t.lit[night > 0.15 ? 1 : 0] : t.img;
+      let img = t.frames ? t.frames[ff] : t.lit ? t.lit[night > 0.15 ? 1 : 0] : t.img, ty0_ = t.y;
+      if (t.prop && s.G) {
+        if (t.open) {   // a looted chest swings open once, and stays open
+          if (chestOpen(s.G, t.prop)) {
+            if (t.openT === undefined) { t.openT = t.sawShut ? s.t : -9; if (t.sawShut) for (let i = 0; i < 8; i++) s.particles.push({ x: t.x + 4 + Math.random() * 8, y: t.y + 2, vx: (Math.random() - 0.5) * 16, vy: -8 - Math.random() * 14, life: 0.5 + Math.random() * 0.4, max: 0.9, size: 1, c: i % 2 ? "#c8b890" : "#8a7a5a" }); }
+            const k = s.t - t.openT; img = t.open[k < 0.09 ? 0 : k < 0.2 ? 1 : 2];
+            ty0_ = t.y - (img.height - t.img.height) / WZ;
+          } else { t.sawShut = true; t.openT = undefined; }
+        } else if (propGone(s.G, t.prop)) continue;
+      }
       const iw = t.hi ? img.width / WZ : img.width, ih = t.hi ? img.height / WZ : img.height;
-      if (t.x + iw < cx || t.x > cx + w || t.y + ih < cy || t.y > cy + h) continue;
-      list.push({ img, x: t.x, y: t.y, sortY: t.sortY, hi: t.hi });
+      if (t.x + iw < cx || t.x > cx + w || ty0_ + ih < cy || ty0_ > cy + h) continue;
+      list.push({ img, x: t.x, y: ty0_, sortY: t.sortY, hi: t.hi });
     }
     list.push(...ents);
     list.sort((a, b) => a.sortY - b.sortY);
@@ -986,15 +1012,28 @@ function createEngine(canvas, root, hooks) {
     }
     for (const w of s.wolves) if (w.alert > 0) { ctx.fillStyle = "#e4503c"; ctx.fillRect(Math.round(w.x - cx) - 1, Math.round(w.y - cy) - 34, 2, 6); ctx.fillRect(Math.round(w.x - cx) - 1, Math.round(w.y - cy) - 26, 2, 2); }
 
-    if (m.def.pillar) {
-      const pl = m.def.pillar;
+    for (const pl of pillarList(m.def)) {
+      if (pl.x < cx - 40 || pl.x > cx + w + 40 || pl.base < cy - 20 || pl.base > cy + h + 120) continue;
+      const dim = (m.def.pillars && s.G && !(s.G.pillars && s.G.pillars[pl.id]) ? 0.35 : 1) * pillarStutter(m.def, s.G, night, s.t);   // a sleeping field Pillar barely glows
       for (let i = 0; i < 12; i++) {
         const ph = (s.t * 0.35 + i / 12) % 1;
         const mx = pl.x + Math.sin(i * 12.9) * 14 + Math.sin(s.t * 1.3 + i) * 2;
-        const my = 18 * TILE - 6 - ph * 46;
-        ctx.globalAlpha = Math.sin(ph * Math.PI);
+        const my = pl.base - 6 - ph * 46;
+        ctx.globalAlpha = Math.sin(ph * Math.PI) * dim;
         ctx.fillStyle = i % 3 ? PAL.ley : PAL.leyL;
         ctx.fillRect(Math.round(mx - cx), Math.round(my - cy), 1, 1);
+      }
+      ctx.globalAlpha = 1;
+    }
+    /* snow falling on the northern plains: more of it the further north, drifting with a little wind */
+    const snowHere = snowAtTile(m.def, Math.floor(s.player.y / TILE));
+    if (snowHere > 0.15) {
+      const n = Math.round(snowHere * 90);
+      for (let i = 0; i < n; i++) {
+        const sp = 9 + (i % 5) * 3, ph = hash2(i, 7) / 4294967296, px = ((hash2(i, 3) % 1000) / 1000 * (w + 40) + s.t * (6 + (i % 3)) + Math.sin(s.t * 0.8 + i) * 6) % (w + 40) - 20;
+        const py = ((ph * (h + 20) + s.t * sp) % (h + 20)) - 10;
+        ctx.globalAlpha = 0.45 + (i % 3) * 0.18; ctx.fillStyle = i % 4 ? "#d8dce4" : "#ffffff";
+        ctx.fillRect(Math.round(px), Math.round(py), i % 7 === 0 ? 2 : 1, i % 7 === 0 ? 2 : 1);
       }
       ctx.globalAlpha = 1;
     }
@@ -1011,7 +1050,7 @@ function createEngine(canvas, root, hooks) {
     if (s.emotes.length) drawEmotes(cx, cy);
     if (s.fireSpots && s.mapId === "oak") { ctx.globalAlpha = 0.12 + 0.04 * Math.sin(s.t * 9) + 0.03 * Math.sin(s.t * 23); ctx.fillStyle = "#d2501c"; ctx.fillRect(0, 0, w, h); ctx.globalAlpha = 1; }
 
-    grade(w, h);
+    grade();
 
     if (s.target && s.mode === "play" && !s.blocked && !s.fade) {
       const bob = Math.round(Math.sin(s.t * 6) * 1.5);
@@ -1031,9 +1070,9 @@ function createEngine(canvas, root, hooks) {
         if (n.map !== s.mapId || !n.path) continue;
         for (const [px2, py2] of n.path) ctx.fillRect(px2 * TILE + 7 - cx, py2 * TILE + 11 - cy, 2, 2);
       }
-      if (m.def.pillar) {
+      for (const pl of pillarList(m.def)) {
         ctx.strokeStyle = PAL.ley; ctx.beginPath();
-        ctx.arc(Math.round(m.def.pillar.x - cx), Math.round(m.def.pillar.y - cy), m.def.pillar.r * TILE, 0, Math.PI * 2); ctx.stroke();
+        ctx.arc(Math.round(pl.x - cx), Math.round(pl.y - cy), pl.r * TILE, 0, Math.PI * 2); ctx.stroke();
       }
     }
 
@@ -1046,36 +1085,35 @@ function createEngine(canvas, root, hooks) {
   }
 
 
-  /* ---------- finishing grade: vignette and fine film grain ---------- */
-  let vig = null, grain = null, grainPat = null, grainT = 0, grainX = 0, grainY = 0;
-  function grade(w, h) {
-    ctx.save();
-    ctx.globalCompositeOperation = "saturation"; ctx.globalAlpha = s.map && s.map.def.outside ? 0.24 : 0.14;
-    ctx.fillStyle = "#808080"; ctx.fillRect(0, 0, w, h);
-    ctx.globalCompositeOperation = "multiply"; ctx.globalAlpha = s.map && s.map.def.outside ? 1 : 0.6;
-    ctx.fillStyle = "#dfe3ea"; ctx.fillRect(0, 0, w, h);
-    ctx.restore();
-    if (!vig || vig.width !== w || vig.height !== h) {
-      vig = makeCanvas(w, h);
-      const v = vig.getContext("2d");
-      const gr = v.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.32, w / 2, h / 2, Math.hypot(w, h) * 0.56);
-      gr.addColorStop(0, "rgba(10,6,22,0)"); gr.addColorStop(1, "rgba(10,6,22,0.5)");
-      v.fillStyle = gr; v.fillRect(0, 0, w, h);
+  /* ---------- finishing grade: a cool desaturation, vignette and fine film grain ----------
+     Done by the compositor, not the canvas: a CSS colour filter on the world canvas, and two still
+     overlays (vignette, grain) above it. Full-screen blend passes on the canvas cost phones a third
+     of every frame; these cost almost nothing. */
+  let fxV = null, fxG = null, fxMode = "", grainT = 0, grainUrl = "";
+  function grade() {
+    const out = !!(s.map && s.map.def.outside), mode = out ? "out" : "in";
+    if (!fxV) {
+      try {
+        const mk = (cls) => { const d = document.createElement("div"); d.className = "dz-fx " + cls; d.setAttribute("aria-hidden", "true"); d.style.cssText = "position:absolute;inset:0;pointer-events:none;"; canvas.insertAdjacentElement("afterend", d); return d; };
+        fxG = mk("dz-fx-grain"); fxV = mk("dz-fx-vig");
+        fxV.style.background = "radial-gradient(ellipse 72% 78% at 50% 50%, rgba(10,6,22,0) 52%, rgba(10,6,22,.5) 118%)";
+        const g = makeCanvas(64, 64), gc = g.getContext("2d"), id = gc.createImageData(64, 64);
+        for (let i = 0; i < 64 * 64; i++) { const v = Math.random() < 0.5 ? 0 : 255; id.data[i * 4] = v; id.data[i * 4 + 1] = v; id.data[i * 4 + 2] = v; id.data[i * 4 + 3] = 255; }
+        gc.putImageData(id, 0, 0); grainUrl = g.toDataURL();
+        fxG.style.backgroundImage = `url(${grainUrl})`; fxG.style.imageRendering = "pixelated"; fxG.style.opacity = "0.024";
+      } catch (e) { fxV = fxV || {}; }
     }
-    ctx.drawImage(vig, 0, 0);
-    if (!grain) {
-      grain = makeCanvas(64, 64);
-      const gc = grain.getContext("2d"), id = gc.createImageData(64, 64);
-      for (let i = 0; i < 64 * 64; i++) { const v = Math.random() < 0.5 ? 0 : 255; id.data[i * 4] = v; id.data[i * 4 + 1] = v; id.data[i * 4 + 2] = v; id.data[i * 4 + 3] = 255; }
-      gc.putImageData(id, 0, 0);
-      grainPat = ctx.createPattern(grain, "repeat");
+    if (mode !== fxMode) {
+      fxMode = mode;
+      // saturation at .24 / .14 toward grey, then a multiply by #dfe3ea at full / .6 strength
+      canvas.style.filter = out ? "saturate(0.76) brightness(0.9)" : "saturate(0.86) brightness(0.94)";
     }
-    if (s.t - grainT > 0.12) { grainT = s.t; grainX = (Math.random() * 64) | 0; grainY = (Math.random() * 64) | 0; }
-    ctx.save();
-    ctx.globalAlpha = 0.024;
-    ctx.translate(-grainX, -grainY);
-    ctx.fillStyle = grainPat; ctx.fillRect(grainX, grainY, w, h);
-    ctx.restore();
+    if (fxG && fxG.style && s.t - grainT > 0.12) {
+      grainT = s.t;
+      const k = (s.view.scale || 1) / (window.devicePixelRatio || 1);
+      fxG.style.backgroundSize = `${64 * k}px ${64 * k}px`;
+      fxG.style.backgroundPosition = `${-((Math.random() * 64) | 0) * k}px ${-((Math.random() * 64) | 0) * k}px`;
+    }
   }
 
   /* The burning town: flame tongues on every roof in view, rolling smoke, flares of sparks. Drawn after the light pass, so fire glows. */
@@ -1154,8 +1192,9 @@ function createEngine(canvas, root, hooks) {
     if (s.stage && s.stage.lights) for (const L of s.stage.lights(s.t - s.stage.t0)) vis.push(L);
     if (s.mode === "play" && !inside) vis.push({ x: s.player.x, y: s.player.y - 6, r: m.def.dark ? 88 : 44, c: PAL.glow, soft: true, str: m.def.dark ? 1.4 : 1.15 });
     if (s.mode === "play" && s.lightT > s.t) { const k = Math.min(1, (s.lightT - s.t) / 4); vis.push({ x: s.player.x, y: s.player.y - 8, r: 74, c: PAL.leyL, soft: true, str: 0.95 * k + 0.05 }); }
+    const stut = pillarStutter(m.def, s.G, night, s.t);
     for (const L of vis) {
-      const str = L.str || 1;
+      const str = (L.str || 1) * (L.stutter ? stut : 1);
       lctx.globalAlpha = str * (L.flicker ? 0.86 + 0.14 * Math.sin(s.t * 9 + L.x) : L.soft ? 0.55 : 1);
       lctx.drawImage(art.light(L.r), Math.round(L.x - L.r - cx), Math.round(L.y - L.r - cy));
     }
@@ -1183,7 +1222,7 @@ function createEngine(canvas, root, hooks) {
     if (dt > 0.25) dt = 0.25;
     acc += dt;
     while (acc >= STEP) { update(STEP); acc -= STEP; }
-    render();
+    if (!s.hidden) render();   // nothing to draw while a full-screen battle covers the world
     s.fpsFrames++; s.fpsTime += dt;
     if (s.fpsTime >= 0.5) { s.fps = Math.round(s.fpsFrames / s.fpsTime); s.fpsFrames = 0; s.fpsTime = 0; }
   }
@@ -1283,6 +1322,7 @@ function createEngine(canvas, root, hooks) {
     warp(mapId, tx, ty, dir, opts = {}) {
       fadeTo(() => { if (opts.before) opts.before(); loadMap(mapId, tx, ty, dir); if (opts.after) opts.after(); }, opts.dur || 0.35);
     },
+    fade(cb, dur = 0.5) { fadeTo(cb, dur); },
     resetPassOut() { s.passOutSent = false; },
     sync() { if (s.G) { s.G.map = s.mapId; s.G.x = Math.round(s.player.x); s.G.y = Math.round(s.player.y); s.G.dir = s.player.dir; } },
     burst() {
@@ -1300,11 +1340,14 @@ function createEngine(canvas, root, hooks) {
     playerTile: () => [Math.floor(s.player.x / TILE), Math.floor((s.player.y - 2) / TILE)],
     resolveEncounter(outcome) {
       const w = s.encounter; s.encounter = null; if (!w) return;
-      if (outcome === "won") { s.G.slain = s.G.slain || {}; s.G.slain[w.key] = s.G.day; s.wolves = s.wolves.filter((x) => x !== w); }
+      if (outcome === "won") { markSlain(s.G, w.key, w.big); s.wolves = s.wolves.filter((x) => x !== w); }
       else if (outcome === "fled") { w.stun = 8; const dx = w.x - s.player.x, dy = w.y - s.player.y, d = Math.hypot(dx, dy) || 1; w.x += (dx / d) * 26; w.y += (dy / d) * 26; }
       else spawnWolves();
     },
     inPillar: () => inPillar(s.player.x, s.player.y),
+    /* a rest at a Pillar: the beasts are back where they were, and everyone is where the hour puts them */
+    rested() { settleNpcs(); spawnWolves(); updateHud(); },
+    respawnWild() { spawnWolves(); },
     crits: () => s.critters.map((c) => ({ k: c.k, x: Math.round(c.x), y: Math.round(c.y), run: !!c.running })),
     placePlayer(x, y) { s.player.x = x; s.player.y = y; },
     castMap(kind) {
@@ -1328,7 +1371,8 @@ function createEngine(canvas, root, hooks) {
       return "";
     },
     setPaused(v) { s.paused = !!v; last = performance.now(); acc = 0; },
+    setHidden(v) { s.hidden = !!v; },
     debugState: () => s,
-    destroy() { cancelAnimationFrame(raf); ro.disconnect(); document.removeEventListener("visibilitychange", onVis); },
+    destroy() { cancelAnimationFrame(raf); ro.disconnect(); document.removeEventListener("visibilitychange", onVis); for (const d of [fxV, fxG]) if (d && d.remove) d.remove(); fxV = fxG = null; fxMode = ""; canvas.style.filter = ""; },
   };
 }

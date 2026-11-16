@@ -18,6 +18,12 @@
 | minigame.mp3 | Minigame |
 | final.mp3 | The Final of The Fantasy (End of Act One credits) |
 
+### Act Two music
+Music composed by **Bert Cole** (bitbybitsound.com), shipped as 18 MP3s in `public/music/` (`a2*.mp3`: plains, night, forest, camp, Ashford, Greywick, the march, the fort, home, tavern, inside, underground, beasts, fight, boss, spar, credits). Check the pack's licence before redistributing the raw files.
+
+## Sound effects and ambience
+*Free Fantasy SFX Pack* by **TomMusic** (tommusic.itch.io), shipped as MP3s in `public/sfx/`. Check the pack's licence before redistributing the raw files.
+
 ## Art
 Character, creature and battle art is built from free packs on **craftpix.net**, recoloured ("grimmed") to the game's palette and baked into the data files in `src/parts/` (base64 PNG atlases). Packs used include:
 

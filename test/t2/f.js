@@ -1,0 +1,23 @@
+const { boot, jump } = require('./common');
+(async () => {
+  const { b, pg, errs } = await boot({ viewport: { width: 640, height: 360 }, dsf: 3 });
+  const warp = async (m, x, y, d) => { await pg.evaluate(([m, x, y, d]) => window.__durinn.eng.warp(m, x, y, d, { dur: 0.2 }), [m, x, y, d]); await pg.waitForTimeout(1000); };
+  const shot = (n) => pg.screenshot({ path: `shots2/${n}.png` });
+  const A = async (w = 350) => { await pg.keyboard.press('e'); await pg.waitForTimeout(w); };
+  await pg.addStyleTag({ content: '.dz-hud,.dz-ctl,.dz-menu-btn,.dz-toast,.dz-dn{opacity:0!important}' });
+  await pg.evaluate(() => { window.__durinn.G().flags.__nowild = true; });
+  await warp('store_back', 8, 5, 'right'); await shot('f1');
+  await pg.keyboard.press('e'); await pg.waitForTimeout(150); await shot('f2');
+  await pg.waitForTimeout(500); await pg.addStyleTag({ content: '.dz-dialog{opacity:0!important}' }); for (let i = 0; i < 4; i++) await A(); await shot('f3');
+  await warp('wood', 23, 38, 'left'); await shot('f4'); await A(); await A(); await A(); await shot('f5');
+  console.log('slain', await pg.evaluate(() => { const G = window.__durinn.G(), a = window.__durinn.act2; G.flags.act2 = true; a.markSlain(G, 'wood:0', false); a.markSlain(G, 'wood:9', true); const x = [a.isSlain(G, 'wood:0'), a.isSlain(G, 'wood:9')]; G.party.wren.hp = 3; const r = a.pillarRest(G, 'oak', true); x.push(a.isSlain(G, 'wood:0'), a.isSlain(G, 'wood:9'), G.party.wren.hp, JSON.stringify(r), G.time, G.day); const r2 = a.pillarRest(G, 'oak', true); x.push(G.time, G.day); delete G.flags.act2; return x.join(' '); }));
+  await jump(pg, 'a2_rebuilt');
+  await warp('oak', 41, 18, 'right'); await shot('f6');
+  await pg.evaluate(() => { window.__durinn.G().flags.__gate_shut = true; window.__durinn.eng.refreshWorld(); }); await warp('oak', 41, 18, 'right'); await shot('f7');
+  await pg.evaluate(() => { delete window.__durinn.G().flags.__gate_shut; window.__durinn.eng.refreshWorld(); });
+  await warp('oak', 16, 12, 'left'); await shot('f8');
+  await warp('oak', 14, 28, 'up'); await shot('f9');
+  await warp('oak', 30, 22, 'down'); await shot('f10');
+  await warp('oak', 22, 40, 'down'); await shot('f11');
+  console.log(errs.filter((e) => !/ERR_TUNNEL/.test(e))); await b.close();
+})();

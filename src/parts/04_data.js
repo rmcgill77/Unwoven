@@ -75,7 +75,7 @@ const ITEMS = {
   ink: { name: "Ink and quill", price: 8, desc: "Wenna swears the ink comes from Durte. Nobody asks how." },
   delivery: { name: "Delivery", quest: true, desc: "Work from the shop, to be delivered." },
   parcel: { name: "Joss's parcel", quest: true, desc: "Brown paper, string, and a faint smell of tea. For Wenna Pike." },
-  poultice: { name: "Poultice", price: 6, desc: "Moss, clay and a clean rag. Heals 24 in a fight." },
+  poultice: { name: "Poultice", price: 6, desc: "Moss, clay and a clean rag. Mends a wound in a fight." },
   oil: { name: "Flask of lamp oil", quest: true, desc: "A stoppered flask of lamp oil. It smells of tallow and old grudges." },
   tome: { name: "Oilcloth bundle", quest: true, desc: "A battered book wrapped in oilcloth. Strange letters crawl across the cover. Reading it could hang you." },
   letter: { name: "Sealed letter", quest: true, desc: "Heavy paper, a guild wax seal, and no name on the front. For Old Maud." },
@@ -104,14 +104,14 @@ const SHOP_STOCK = ["bread", "candle", "tonic", "rope", "ink", "poultice"];
 /*  outside  . grass  , tuft  * flowers  = path  ~ water  B bridge     */
 /*           c crops  f fence  T tree  R roof  W wall  w window        */
 /*           D door  S sign  P pillar  b bush  r rock  # stone wall    */
-/*           Z barricade                                               */
+/*           Z barricade  G open gate  g shut gate                     */
 /*  inside   X dark wall  U upper wall  Y upper wall with window       */
 /*           L lower wall  o plank floor  s stone floor  u rug         */
 /*           K counter  m door mat (exit)                              */
 /* props: furniture placed on tiles { p, x, y, v?, id?, station? }    */
 /* warps: walk onto (x,y) to arrive at map `to`, tile (tx,ty)          */
 /* ------------------------------------------------------------------ */
-const SOLID_TILES = new Set(["T", "~", "R", "W", "w", "f", "S", "P", "b", "r", "#", "Z", "X", "U", "Y", "L", "K", "C"]);
+const SOLID_TILES = new Set(["T", "~", "R", "W", "w", "f", "S", "P", "b", "r", "#", "Z", "g", "X", "U", "Y", "L", "K", "C", "F", "H"]);
 
 const MAP_DEFS = {
   oak: {
@@ -584,9 +584,18 @@ const ASH_SCHED = {
   mayor: { h: 0, map: "oak", x: 27, y: 22, w: 0, where: "beside the Pillar" },
   edda: { h: 0, map: "oak", x: 20, y: 22, w: 1, where: "beside the Pillar" },
 };
+/* The town half rebuilt (Act 2, the letter to Maud): the survivors have somewhere to stand again. */
+const REBUILT_SCHED = {
+  bram: { h: 0, map: "tavern", x: 3, y: 3, w: 2, where: "the Hollow Oak" },
+  wenna: { h: 0, map: "store", x: 5, y: 3, w: 1, where: "Pike's Provisions" },
+  tomas: { h: 0, map: "oak", x: 42, y: 20, w: 1, where: "the east gate" },
+  mayor: { h: 0, map: "oak", x: 15, y: 28, w: 1, where: "the frame of the Mayor's House" },
+  edda: { h: 0, map: "oak", x: 5, y: 41, w: 1, where: "the turnip field" },
+};
 function scheduleAt(def, hour, flags) {
-  if (flags && flags.d5_ash) return ASH_SCHED[def.id] || SCHED_NONE;
-  if (flags && flags.d4_fire) return FIRE_SCHED[def.id] || SCHED_NONE;
+  if (flags && flags.oak_rebuilt && !def.act2) return REBUILT_SCHED[def.id] || SCHED_NONE;
+  if (flags && flags.d5_ash && !def.act2) return ASH_SCHED[def.id] || SCHED_NONE;
+  if (flags && flags.d4_fire && !def.act2) return FIRE_SCHED[def.id] || SCHED_NONE;
   if (def.flagSched && flags) for (const q of def.flagSched) if (q.when(flags, hour)) return q.e;
   let e = def.schedule[0];
   for (const s of def.schedule) if (s.h <= hour) e = s;
@@ -885,12 +894,13 @@ const SCRIPTS = {
     { who: "tessa", t: "We buried {mentor} with the others. I said something over her. It wasn't good, but it was something." },
     { who: "narrator", t: "Where the workshop stood there is a black frame and a smell. You still have the tome. Of everything in Oakhaven, you still have the tome." },
     { who: "tessa", t: "The Arbitrator says Vex went north into the fog and the fog closed behind him. She says every Pillar between here and Ashford is a target now." },
-    { who: "tessa", t: "There's a Weaver outpost at Ashford. She thinks they'll know what that book is. She thinks you should go there." },
+    { who: "tessa", t: "She says Ashford will take in whoever is left. Shelter, supplies, a roof that isn't a tarp. She says we should go." },
+    { who: "tessa", t: "She doesn't know about the book. Nobody does but me. Keep it wrapped, and keep it that way." },
     { who: "tessa", t: "I'm coming with you. Don't argue. I've lost enough." },
     { do: (c) => { c.joinParty("tessa"); c.set("act1_end"); } },
     { who: "narrator", t: "Tessa Hollis has joined your party." },
     { who: "narrator", t: "Oakhaven is ash, and you are what is left of the apprenticeship. Speak with the survivors by the Pillar when you are ready." },
-    { who: "narrator", t: "Act One ends here. The road to Ashford opens in the next act." },
+    { who: "narrator", t: "Act One ends here. The east road to Ashford is waiting." },
     { act: "credits" },
   ],
 
@@ -1039,6 +1049,7 @@ const SCRIPTS = {
     "Sit by the Pillar some evening and listen. It sounds like breathing. In, and out.",
     "Hm? Oh, I'm not mad, dear. Just old. People mix the two up.",
     "Every few years they take the books away. And every few years, a few come back.",
+    "My boy writes when he remembers, which is when the Covenant lets him lift his head. I wore their purple once myself, a long time ago. It doesn't wash out.",
       "I've watched you since you were a bundle on the steps of a house, {name}, a bundle with opinions. Nobody asked me to look in on you. I did anyway. Old women are allowed.",
   ])],
 
@@ -1251,6 +1262,10 @@ const LOOK_TEXT = {
     "The stone hums. You feel it in your teeth more than your ears.",
     "Inside its reach the leyline runs calm. Out past the trees, it does not.",
   ],
+  gate: ["The east gate, barred from the far side. A voice behind it says the town is rebuilding, and to come back later."],
+  memorial: ["A standing stone where the workshop was. {mentor}. Guild-mistress of Oakhaven. Under the name, in a smaller hand: 'Measure twice.'", "Someone has left fresh yarrow at the foot of the stone, and a candle stub, and a turnip. That will be Edda.", "The stone is cut clean and set straight. {mentor} would have found something wrong with it, and been pleased."],
+  frame: ["New timber, pegged and raised. It smells of sap instead of smoke.", "A house frame, half done. Somebody has chalked a name on the corner post."],
+  timber: ["Sawn planks, stacked and weighted against the wind.", "Fresh timber, carted in from Ashford. The Covenant's mark is burned into every third plank."],
   barricade: ["A barricade of planks and rope. The watch has closed the roads. The wolves have been bold this year."],
   water: ["The stream runs cold and quick."],
   crops: ["Edda's turnip rows. Better leave them be."],
@@ -1305,7 +1320,11 @@ function taskListMain(G, ctx) {
     else l.push({ text: "Take the bundle home and read it after dark", done: false, hint: evening ? `Your cot is in ${buildVars(G).shop_name}` : "" });
     return l;
   }
-  if (f.d5_ash) return [{ text: "Speak with the survivors by the Pillar", done: false, hint: "Beside the Pillar in the square" }, { text: "Act One ends here. The road to Ashford opens next.", done: false }];
+  if (f.oak_rebuilt && !(f.act2 && f.reached_ash)) return [{ text: "Oakhaven is rebuilding", done: false, hint: "Bram will trade at the Hollow Oak. The memorial stands where the workshop was." }];
+  if (f.act2 && f.reached_ash && typeof ashTasks === "function") return ashTasks(G, ctx);
+  if (f.act2 && f.left_oak) return [{ text: "Follow the road east to Ashford", done: false, hint: "Ashford lies south-east of the road, past the old farmstead" }];
+  if (f.act2) return [{ text: "Take the east road to Ashford", done: false, hint: "Through Oakhaven's east gate" }];
+  if (f.d5_ash) return [{ text: "Speak with the survivors by the Pillar", done: false, hint: "Beside the Pillar in the square" }, { text: "Act One ends here. The east road to Ashford is waiting.", done: false }];
   if (f.d4_fire) return [{ text: f.d4_lost ? "Rest" : "Reach the workshop", done: false, hint: "It is burning" }];
   if (G.day === 4) {
     const l = [];
@@ -1516,10 +1535,10 @@ SCRIPTS.look_shroom = (c) => {
 };
 SCRIPTS.look_herbpatch = (c, id) => {
   const k = "herb_" + id;
-  if (c.G.flags[k] === c.G.day) return [{ who: "narrator", t: "Picked clean. It will come back by tomorrow." }];
+  if (c.G.picked && c.G.picked[k]) return [{ who: "narrator", t: "Cut to the root. It will come back when it pleases." }];
   return [
-    { do: (c) => { c.set(k, c.G.day); c.give("yarrow", 1); } },
-    { who: "narrator", t: "You cut a bundle of yarrow and feverfew. Wenna will pay for it." },
+    { do: (c) => { pickMark(c.G, k); c.give("yarrow", 1); } },
+    { who: "narrator", t: c.flag("act2") ? "You cut a bundle of yarrow and feverfew. A herbalist will pay for it." : "You cut a bundle of yarrow and feverfew. Wenna will pay for it." },
   ];
 };
 const CHEST_LOOT = {
@@ -1543,10 +1562,14 @@ SCRIPTS.look_chest = (c, id) => {
   if (!loot) return [{ who: "narrator", t: c.rot("look:chest", LOOK_TEXT.chest) }];
   if (c.flag("chest_" + id)) return [{ who: "narrator", t: "Empty. Somebody got here first, and it was you." }];
   const [coins, items] = loot, names = Object.keys(items).map((k) => `${items[k] > 1 ? items[k] + " × " : ""}${ITEMS[k].name.toLowerCase()}`);
-  return [
-    { do: (c) => { c.set("chest_" + id); c.coins(coins); for (const k in items) c.give(k, items[k]); } },
-    { who: "narrator", t: `The hasp is rusted through. Inside: ${coins} coppers${names.length ? ", " + names.join(", ") : ""}.` },
+  const rec = typeof CHEST_RECIPE !== "undefined" && CHEST_RECIPE[id];
+  const out = [
+    { do: (c) => { c.set("chest_" + id); c.coins(coins); for (const k in items) c.give(k, items[k]); if (rec) learnRecipe(c.G, rec); } },
+    { who: "narrator", t: `${id === "c_stones" ? "The stone lid grinds aside." : "The hasp is rusted through."} Inside: ${coins ? coins + " coppers" : ""}${names.length ? (coins ? ", " : "") + names.join(", ") : ""}.` },
   ];
+  if (rec) out.push({ who: "narrator", t: `Folded underneath, a recipe note: ${ITEMS[RECIPES[rec].out].name.toLowerCase()}. You can make it at any Pillar now.` });
+  if (id === "c_stones") out.push({ who: "narrator", t: "The ground shudders. Behind you, one of the standing stones turns its head." }, { do: (c) => { c.set("stones_taken"); c.wakeWild(); } });
+  return out;
 };
 SCRIPTS.look_bloom = (c, id) => {
   const f = c.G.flags, k = "bloom_" + id;
@@ -1586,7 +1609,11 @@ function worldDef(id, flags) {
   if (!base || !flags) return base;
   if (id === "rocks") return flags.moved_seal ? { ...base, props: base.props.filter((p) => p.id !== "seal") } : base;
   if (id !== "oak" || (!flags.d4_open && !flags.south_open && !flags.d5_ash && !flags.d4_fire)) return base;
-  let rows = base.rows, warps = base.warps;
+  if (flags.oak_rebuilt) return oakRebuilt(base, flags);
+  let rows = base.rows, warps = base.warps, signs = base.signs;
+  if (flags.act2) { rows = rows.map((r, y) => (y === 17 ? r.slice(0, 43) + "S." + r.slice(45) : r)); signs = { ...signs, "43,17": signs["44,17"] }; }   // the signpost steps aside for the gate
+  if (flags.act2) rows = rows.map((r, y) => (y === 18 || y === 19 ? r.slice(0, 44) + (flags.__gate_shut ? "g" : "G") + "==" + r.slice(47) : r));   // the east gate stands open, clear of the trees
+  if (flags.act2 && PLAINS_BUILT) warps = [...warps, ...OAK_EAST];
   if (flags.d4_open) rows = rows.map((r, y) => (y === 1 ? r.slice(0, 23) + "==" + r.slice(25) : r));
   if (flags.south_open) rows = rows.map((r, y) => (y === 58 ? r.slice(0, 23) + "==" + r.slice(25) : r));
   if (flags.d5_ash) {
@@ -1594,8 +1621,60 @@ function worldDef(id, flags) {
     warps = warps.filter((w) => w.to === "wood" || w.to === "rocks");
   }
   if (flags.d4_fire && !flags.d5_ash) warps = warps.filter((w) => w.to === "wood" || w.to === "rocks");   // every door is ablaze
-  return { ...base, rows, warps, burning: !!(flags.d4_fire && !flags.d5_ash), doorKinds: flags.d5_ash ? {} : base.doorKinds };
+  if (flags.d5_ash && flags.act2 && PLAINS_BUILT) warps = [...warps.filter((w) => !w.to.startsWith("plains")), ...OAK_EAST];
+  return { ...base, rows, warps, signs, burning: !!(flags.d4_fire && !flags.d5_ash), doorKinds: flags.d5_ash ? {} : base.doorKinds };
 }
+
+/* the east road out of Oakhaven, onto the Ashford road of the Open Plains */
+const OAK_EAST = [{ x: 47, y: 18, to: "plainsSW", tx: 1, ty: 28, dir: "right" }, { x: 47, y: 19, to: "plainsSW", tx: 1, ty: 29, dir: "right" }];
+/* Oakhaven some weeks on: a few buildings raised again, the rest cleared lots with new timber going up.
+   Rebuilt houses are named by their door tile; everything else that burned is a lot. */
+const REBUILT_DOORS = new Set(["31,12", "34,26", "32,38", "13,38", "31,48"]);   // Pike's, the Hollow Oak, the chapel, Garrick's, the watch house
+const REBUILT_PROPS = [
+  { p: "memorial", x: 14, y: 11 }, { p: "candles", x: 15, y: 11 },
+  { p: "frame", x: 12, y: 24 }, { p: "timber", x: 15, y: 25 }, { p: "frame", x: 17, y: 36 }, { p: "timber", x: 39, y: 37 },
+  { p: "frame", x: 39, y: 46 }, { p: "timber", x: 13, y: 47 }, { p: "frame", x: 2, y: 36 }, { p: "timber", x: 20, y: 11 },
+];
+function oakRebuilt(base, flags) {
+  const cells = base.rows.map((r) => r.split("")), h = cells.length, w = cells[0].length, B = "RWwD", seen = new Set();
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (!B.includes(cells[y][x]) || seen.has(x + "," + y)) continue;
+    const lot = [], st = [[x, y]]; seen.add(x + "," + y); let keep = false;
+    while (st.length) {
+      const [cx, cy] = st.pop(); lot.push([cx, cy]);
+      if (cells[cy][cx] === "D" && REBUILT_DOORS.has(cx + "," + cy)) keep = true;
+      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = cx + dx, ny = cy + dy, k = nx + "," + ny; if (nx >= 0 && ny >= 0 && nx < w && ny < h && !seen.has(k) && B.includes(cells[ny][nx])) { seen.add(k); st.push([nx, ny]); } }
+    }
+    if (!keep) for (const [cx, cy] of lot) cells[cy][cx] = (cx * 7 + cy * 3) % 11 === 0 ? "r" : (cx + cy) % 3 ? "." : ",";
+  }
+  for (const y of [18, 19]) { cells[y][44] = flags.__gate_shut ? "g" : "G"; cells[y][46] = "="; }
+  cells[17][44] = "."; cells[17][43] = "S";
+  if (flags.d4_open) { cells[1][23] = "="; cells[1][24] = "="; }
+  if (flags.south_open) { cells[58][23] = "="; cells[58][24] = "="; }
+  const doorKinds = {}; for (const k in base.doorKinds) if (REBUILT_DOORS.has(k)) doorKinds[k] = base.doorKinds[k];
+  return { ...base, rows: cells.map((r) => r.join("")), doorKinds, rebuilt: true,
+    props: [...base.props, ...REBUILT_PROPS],
+    warps: [...base.warps.filter((wp) => wp.to === "wood" || wp.to === "rocks" || REBUILT_DOORS.has(wp.x + "," + wp.y)), ...(PLAINS_BUILT ? OAK_EAST : [])],
+    signs: { ...base.signs, "15,13": ["Here stood the workshop of {mentor}, guild-mistress. The guild will raise it again when there is a guild to raise it."], "43,17": ["East road: Ashford and the outer provinces. The gate is open by order of the Arbitrator."] } };
+}
+
+/* The town is polite, and no more. They buried a lot of people, and you walked out of the middle of it. */
+const REBUILT_TALK = {
+  wenna: ["Shop's shut to you. I've nothing against you, {name}. I've nothing for you either.", "Folk say the fire followed you home. I don't say it. I don't say it isn't so."],
+  tomas: ["The gate's open because the Arbitrator said so. I'd have kept it shut a while longer.", "Go on through, {surname}. Don't make me write anything down."],
+  mayor: ["Ah. You. We are rebuilding. There is a great deal of paper involved. Please do not stand near it."],
+  edda: ["Turnips came up. That's something. You look thin, {name}. I'd feed you, but folk would talk, and I've to live here.", "I leave a turnip at the stone for her. Don't tell anyone it's me."],
+};
+SCRIPTS.bram_rebuilt = (c) => ["There you are. Sit. Nobody else will say it, so I will: it wasn't you. It was a man with a grudge and a book.", { choice: [
+  ["I need supplies.", ["Back shelf's yours. Bread, bandages, what I could get off the Ashford carters.", { shop: "bram" }]],
+  ["How is the town?", [c.rot("bram_rb", [
+    "Half a roof is still a roof. The Hollow Oak pours again, and that's where a town starts.",
+    "They're cold to you because they need somebody to be cold to, and the fire's gone out. Give them a season.",
+    "Tessa writes. Three lines, all of them about boots. She gets that from her mother.",
+    "We put the stone where the workshop was. She'd have hated the fuss. That's rather why we did it.",
+  ])]],
+  ["Just passing through.", ["Aren't we all. Mind the third step. It survived. Of course it did."]],
+] }];
 
 const ASH_TALK = {
   tessa: ["The Arbitrator says Ashford. I say Ashford. For once we agree.", "I keep looking for the Hollow Oak's sign. Then I remember."],

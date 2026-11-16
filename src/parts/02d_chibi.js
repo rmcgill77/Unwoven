@@ -136,7 +136,18 @@ function battleSlice(src, d) {
 const PLAYER_BATTLE = new Map();
 /* Sword in hand on the attack frames: hand spots are measured from the base atlas (96 x 84 frames). */
 const SWORD_POSE = [null, [56, 62, -125, 0], [56, 62, -120, 0], [57, 63, -112, 0], [59, 64, -100, 0], [60, 64, -88, 0], [68, 60, -60, 1], [68, 44, -30, 1], [71, 41, 5, 1], [72, 42, 20, 1]];
-function drawSwordOn(ctx, hx, hy, deg) {
+/* The swing as one motion: hand spot and blade angle for every attack frame, read between frames so the blade
+   never jumps. It is drawn at fight time, in front of the figure, so it stays in the hand the whole way round:
+   held upright, drawn back over the shoulder, then cut forward and down. */
+const SWING_POSE = [[58, 60, -95], [56, 61, -110], [55, 61, -128], [55, 62, -146], [57, 63, -152], [60, 63, -136], [68, 58, -82], [69, 45, -36], [71, 41, 4], [72, 42, 22]];
+function swingPose(f) {   // the hand sits exactly where this frame's arm puts it; only the blade's angle glides between frames
+  f = Math.max(0, Math.min(SWING_POSE.length - 0.001, f));
+  const fi = Math.floor(f), g = Math.max(0, Math.min(SWING_POSE.length - 1, f - 0.5)), i = Math.floor(g), j = Math.min(SWING_POSE.length - 1, i + 1), k = g - i;
+  return [SWING_POSE[fi][0], SWING_POSE[fi][1], SWING_POSE[i][2] + (SWING_POSE[j][2] - SWING_POSE[i][2]) * k];
+}
+const SWORD_TINT = { thornwake: ["#7fae6a", "#c9e0bc"], fortblade: ["#7fb4b0", "#c8f4ee"], leyblade: ["#7fb4b0", "#c8f4ee"], frostcrown: ["#8fc4cc", "#e0fbff"], hakoncleaver: ["#8a8a92", "#c4c4cc"] };
+function drawSwordOn(ctx, hx, hy, deg, tint) {
+  const steel = (tint && tint[0]) || "#aab3bd", shine = (tint && tint[1]) || "#e3e8ee";
   const a = (deg * Math.PI) / 180, ux = Math.cos(a), uy = Math.sin(a), nx = -uy, ny = ux;
   const px = (x, y, col) => { ctx.fillStyle = col; ctx.fillRect(Math.round(x), Math.round(y), 1, 1); };
   const along = (t, w, col) => { for (let k = -w; k <= w; k++) px(hx + ux * t + nx * k, hy + uy * t + ny * k, col); };
@@ -145,8 +156,8 @@ function drawSwordOn(ctx, hx, hy, deg) {
   for (let k = -4; k <= 4; k += 0.5) { px(hx + ux * 3 + nx * k, hy + uy * 3 + ny * k, "#1c1620"); }
   for (let k = -3; k <= 3; k += 0.5) px(hx + ux * 3 + nx * k, hy + uy * 3 + ny * k, "#8a7a5e");
   for (let t = 4; t <= 28; t += 0.5) along(t, 2, "#1c1620");
-  for (let t = 4; t <= 27; t += 0.5) { along(t, 1, "#aab3bd"); px(hx + ux * t - nx, hy + uy * t - ny, "#e3e8ee"); }
-  px(hx + ux * 28, hy + uy * 28, "#e3e8ee");
+  for (let t = 4; t <= 27; t += 0.5) { along(t, 1, steel); px(hx + ux * t - nx, hy + uy * t - ny, shine); }
+  px(hx + ux * 28, hy + uy * 28, shine);
 }
 function swordSet(set) {
   if (!set) return set;
@@ -169,5 +180,5 @@ function battleFor(key, look, weapon) {
     const bk = cutKey(look), d = BATTLE_DATA.chars[bk], { c } = recolourAtlas(CHIBI.bImgs[bk], CHIBI.bRoleImgs[bk], look);
     s = battleSlice(c, d); PLAYER_BATTLE.set(k, s);
   }
-  return weapon === "oldsword" || weapon === "thornwake" ? swordSet(s) : s;
+  return weapon && s.anims.attack_sword ? swordSet(s) : s;   // Elowyn's swing is painted into her own frames; everyone else's blade is drawn live
 }

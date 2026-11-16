@@ -1,7 +1,7 @@
 /* Builds Unwoven from src/parts into:
  *   build/test.html   local test page (React bundled from node_modules; used by the Playwright tests)
- *   build/artifact.html  single file for the private claude.ai artifact (React from cdnjs; music served beside it)
- *   dist/             the release: index.html + vendor.js + music/, ready for GitHub Pages or any static host
+ *   build/artifact.html  single file for the private claude.ai artifact (React from cdnjs; music and sfx served beside it)
+ *   dist/             the release: index.html + vendor.js + music/ + sfx/, ready for GitHub Pages or any static host
  * Usage: node scripts/build.cjs            (all)
  *        node scripts/build.cjs --dev      (also writes an unminified build/game.dev.js for profiling)
  */
@@ -10,10 +10,8 @@ const esbuild = require("esbuild");
 const ROOT = path.join(__dirname, ".."), r = (...p) => path.join(ROOT, ...p);
 const pkg = require(r("package.json"));
 
-// concatenation order matters: data before the code that reads it, the UI last
-const PARTS = ["01_core.js", "02_chars.js", "02c_chibi_data.js", "02f_battle_data.js", "02g_elowyn_data.js", "02h_foes_data.js", "02j_crit_data.js", "02k_map_data.js",
-  "02i_foes.js", "02d_chibi.js", "03a_world_p1.js", "03b_world.js", "03c_grim.js", "04_data.js", "04b_wilds.js", "04c_rooms.js", "05_engine.js", "06_minigames.js",
-  "06e_battle.js", "06f_magic.js", "06g_gear.js", "06h_debug.js", "06k_music.js", "06b_splash.jsx", "06c_battleart.jsx", "06i_intro.jsx", "07_ui.jsx"];
+// concatenation order matters: data before the code that reads it, the UI last (same order as the Act 2 source build)
+const PARTS = ["01_core.js","02_chars.js","02c_chibi_data.js","02f_battle_data.js","02g_elowyn_data.js","02m_ash_chibi_data.js","02n_npc_chibi_data.js","02h_foes_data.js","02h2_foes2_data.js","02j_crit_data.js","02k_map_data.js","02l_pave_data.js","02o_bg_data.js","02p_icon_data.js","02q_book_data.js","02i_foes.js","02d_chibi.js","03a_world_p1.js","03b_world.js","03c_grim.js","04_data.js","04b_wilds.js","04c_rooms.js","04e_plains.js","04d_act2.js","04f_plains_life.js","04g_ashford.js","04h_ashford_life.js","04i_wforest.js","04j_wforest_life.js","04k_eforest.js","04l_eforest_life.js","04m_greywick.js","04n_greywick_life.js","04o_outskirts.js","04p_outskirts_life.js","04q_fort.js","04r_fort_life.js","04s_act2_end.js","05_engine.js","06_minigames.js","06e_battle.js","06e2_foes2.js","06f_magic.js","06g2_gear_data.js","06g_gear.js","06l_ash_late.js","06m_fort_late.js","06j_study.jsx","06h_debug.js","06k_music.js","06n_audio.js","06o_book.jsx","06b_splash.jsx","06c_battleart.jsx","06i_intro.jsx","07_ui.jsx"];
 
 const have = new Set(fs.readdirSync(r("src/parts")));
 for (const p of PARTS) if (!have.has(p)) throw new Error("missing part " + p);
@@ -37,7 +35,7 @@ const meta = `<!doctype html>
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="description" content="Unwoven: A Tale of Talvora. Act One playtest build.">
+<meta name="description" content="Unwoven: A Tale of Talvora. Acts One and Two playtest build.">
 <meta name="apple-mobile-web-app-title" content="Unwoven">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
@@ -66,6 +64,7 @@ esbuild.buildSync({ entryPoints: [r("build/vendor-entry.js")], bundle: true, for
 // local test page (tests open build/test.html; music resolves to build/music)
 fs.writeFileSync(r("build/test.html"), meta + head + `<script src="vendor.js"></script>\n` + game);
 copyDir(r("public/music"), r("build/music"));
+copyDir(r("public/sfx"), r("build/sfx"));
 copyDir(r("public/icons"), r("build/icons"));
 fs.copyFileSync(r("public/manifest.webmanifest"), r("build/manifest.webmanifest"));
 
@@ -80,6 +79,7 @@ fs.mkdirSync(r("dist"), { recursive: true });
 fs.copyFileSync(r("build/vendor.js"), r("dist/vendor.js"));
 fs.writeFileSync(r("dist/index.html"), meta + head + pwa + `<script src="vendor.js"></script>\n` + game);
 copyDir(r("public/music"), r("dist/music"));
+copyDir(r("public/sfx"), r("dist/sfx"));
 copyDir(r("public/icons"), r("dist/icons"));
 fs.copyFileSync(r("public/manifest.webmanifest"), r("dist/manifest.webmanifest"));
 fs.writeFileSync(r("dist/sw.js"), fs.readFileSync(r("public/sw.template.js"), "utf8").replace(/__VERSION__/g, pkg.version));

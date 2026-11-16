@@ -221,8 +221,35 @@ function drawWolf(frame = 0, opts = {}) {
   return s.canvas();
 }
 
+/* Painted backdrops for some regions (baked in 02o_bg_data.js); everywhere else keeps the drawn forest clearing. */
+const BATTLE_BG = {};
+for (const k in BATTLE_BG_SRC) { try { const im = new Image(); im.src = BATTLE_BG_SRC[k]; BATTLE_BG[k] = im; } catch (e) { /* no DOM */ } }
+let BATTLE_SCENE = null, BATTLE_NIGHT = false;
+function battleSceneFor(mapId, tx, ty) {
+  const def = MAP_DEFS[mapId];
+  if (mapId === "fort") return "castle";
+  if (!def || !def.outside) return null;
+  if (mapId === "fort") return "castle";
+  if (mapId === "os") return tx < 22 && ty < 20 ? "rocks" : tx > 70 && ty < 30 ? "frostlake" : "snowwood";
+  if (mapId === "gw") return "snowwood";
+  const sn = snowAtTile(def, ty);
+  if (def.plains && sn > 0.5) return "snowfield";
+  if (def.plains && sn > 0.25) return "birch";
+  return null;
+}
 function drawBattleBackdrop(w, h) {
   const c = makeCanvas(w, h), x = c.getContext("2d");
+  const art = BATTLE_SCENE && BATTLE_BG[BATTLE_SCENE];
+  if (art && art.complete && art.naturalWidth) {
+    const s = Math.max(w / art.naturalWidth, h / art.naturalHeight), dw = art.naturalWidth * s, dh = art.naturalHeight * s;
+    x.imageSmoothingEnabled = false;
+    const lift = { castle: 0.17 }[BATTLE_SCENE] || 0;                                                   // how much of the picture's foot runs off the bottom
+    x.drawImage(art, Math.round((w - dw) / 2), Math.round(h - dh + dh * lift), Math.round(dw), Math.round(dh));   // anchored to the ground
+    if (BATTLE_NIGHT) { x.fillStyle = "rgba(14,16,40,0.5)"; x.fillRect(0, 0, w, h); }
+    const fl = x.createLinearGradient(0, h * 0.62, 0, h);                                                 // a darker band where the fight stands
+    fl.addColorStop(0, "rgba(20,18,26,0)"); fl.addColorStop(1, "rgba(20,18,26,0.28)"); x.fillStyle = fl; x.fillRect(0, h * 0.62, w, h * 0.38);
+    return c;
+  }
   const rnd = mulberry32(4242);
   const hor = Math.round(h * 0.4);
   const sky = ["#16181e", "#1e2128", "#262a31", "#30343b", "#3a3e44", "#44474c", "#4e5054", "#5a5b5e"];
@@ -355,17 +382,18 @@ function BattleScreen({ G, foes, party, magic, settings = {}, canFlee = true, pr
   const cvRef = useRef(null), boxRef = useRef(null);
   const B = useMemo(() => {
     magicEnsure(G);
-    const b = createBattle({ party, foes, items: G.items || {}, canFlee, wait: settings.wait !== false, words: G.words, hotbar: G.hotbar, ley: { wild }, autoRelease: !!settings.autoRelease });
+    const b = createBattle({ party, foes, items: G.items || {}, canFlee, wait: settings.wait !== false, words: G.words, hotbar: G.hotbar, ley: { wild }, autoRelease: !!settings.autoRelease, act2: !!(G.flags && G.flags.act2), mastery: G.mastery });
     b.onSignature = () => { G.sigs = (G.sigs || 0) + 1; };
     return b;
   }, []);
   const [win, setWin] = useState(null);                   // release window overlay
   const winRef = useRef({ bar: null });
+  const [, setRev] = useState(0);   // a foe joining mid-fight needs a new name bar
   const [menu, setMenu] = useState(null);                 // { id, stage: cmd|spell|item|target, pend }
   const [over, setOver] = useState(null);                 // result card
   const menuRef = useRef(null); menuRef.current = menu;
   const hover = useRef(null);
-  const refs = useRef({ foeHp: {}, foeBadge: {}, hp: {}, mp: {}, atb: {}, hpBar: {}, row: {}, ward: {}, log: null });
+  const refs = useRef({ foeCond: {}, foeHp: {}, foeBadge: {}, hp: {}, mp: {}, atb: {}, hpBar: {}, row: {}, ward: {}, log: null });
   const doneRef = useRef(false);
   const hitRef = useRef(null);
   const [tip, setTip] = useState(() => (magic && !(G.flags && G.flags.tip_btl) ? 1 : !(G.flags && G.flags.tip_btl0) && !practice ? 0 : null));
@@ -379,6 +407,7 @@ function BattleScreen({ G, foes, party, magic, settings = {}, canFlee = true, pr
     const u = unitById(m.id);
     if (name === "attack") { const f = livingFoes(); if (f.length === 1) choose({ type: "attack", target: f[0].id }); else setMenu({ ...m, stage: "target", pend: { type: "attack" } }); }
     else if (name === "magic") setMenu({ ...m, stage: "spell" });
+    else if (name === "skill") setMenu({ ...m, stage: "skill" });
     else if (name === "item") setMenu({ ...m, stage: "item" });
     else if (name === "defend") choose({ type: "defend" });
     else if (name === "flee") choose({ type: "flee" });
@@ -391,13 +420,19 @@ function BattleScreen({ G, foes, party, magic, settings = {}, canFlee = true, pr
     if (sp.target === "foe") { const f = livingFoes(); if (f.length === 1) choose({ ...cmd, target: f[0].id }); else setMenu({ ...m, stage: "target", pend: { ...cmd, side: "e", from: "spell" } }); }
     else setMenu({ ...m, stage: "target", pend: { ...cmd, side: "p", from: "spell" } });
   };
+  const pickSkill = (ab) => {
+    const m = menuRef.current, cmd = { type: "skill", skill: ab.id };
+    if (ab.target === "foe") { const f = livingFoes(); if (f.length === 1) choose({ ...cmd, target: f[0].id }); else setMenu({ ...m, stage: "target", pend: { ...cmd, side: "e" } }); }
+    else choose(cmd);
+  };
   const pickRoot = (r) => { const m = menuRef.current; setMenu({ ...m, stage: "suf", root: r }); };
-  const pickItem = (k) => { const m = menuRef.current; setMenu({ ...m, stage: "target", pend: { type: "item", item: k, side: "p" } }); };
+  const pickItem = (k) => { const m = menuRef.current; if (BTL_ITEMS[k].foes) { choose({ type: "item", item: k, target: null }); return; } setMenu({ ...m, stage: "target", pend: { type: "item", item: k, side: "p" } }); };
   const pickTarget = (id) => { const m = menuRef.current; choose({ ...m.pend, target: id }); };
   const back = () => {
     const m = menuRef.current; if (!m) return; hover.current = null;
     if (m.stage === "target" && m.pend.type === "cast") setMenu({ ...m, stage: m.pend.from === "weave" ? "suf" : "spell", pend: null });
     else if (m.stage === "target" && m.pend.type === "item") setMenu({ ...m, stage: "item", pend: null });
+    else if (m.stage === "target" && m.pend.type === "skill") setMenu({ ...m, stage: "skill", pend: null });
     else if (m.stage === "suf") setMenu({ ...m, stage: "root", root: null });
     else if (m.stage === "root") setMenu({ ...m, stage: "spell" });
     else setMenu({ ...m, stage: "cmd", pend: null });
@@ -410,10 +445,11 @@ function BattleScreen({ G, foes, party, magic, settings = {}, canFlee = true, pr
   useEffect(() => {
     const cv = cvRef.current, box = boxRef.current, ctx = cv.getContext("2d");
     let backdrop = null, view = { w: 0, h: 0, scale: 1 }, vig = null, raf = 0, last = performance.now(), t = 0;
-    const floaters = [], parts = [], shake = { t: 0, a: 0 }, logLines = []; let logT = 0;
+    const floaters = [], parts = [], shake = { t: 0, a: 0 }, logLines = []; let logT = 0; let unitN = B.units.length;
     const motes = Array.from({ length: 30 }, () => ({ x: Math.random(), y: Math.random(), s: 0.1 + Math.random() * 0.25, ph: Math.random() * 6 }));
     const sets = {};
-    B.allies().forEach((u) => { sets[u.id] = battleFor(u.key, u.look || {}, (G.equip && G.equip[u.key] && G.equip[u.key].weapon) || null); });
+    const blades = {};
+    B.allies().forEach((u) => { const wp = (G.equip && G.equip[u.key] && G.equip[u.key].weapon) || null; sets[u.id] = battleFor(u.key, u.look || {}, wp); if (wp && sets[u.id] && !sets[u.id].anims.attack_sword) blades[u.id] = wp; });
     const resize = () => {
       const r = box.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
       const devW = Math.max(1, r.width * dpr), devH = Math.max(1, r.height * dpr);
@@ -442,7 +478,11 @@ function BattleScreen({ G, foes, party, magic, settings = {}, canFlee = true, pr
         f = Math.max(0, Math.min(1, f)); f = f * f * (3 - 2 * f);
         x = hx + (tx - hx) * f; y = hy + (ty - hy) * f;
       } else if (a && u.side === "e") {
-        const tg = unitById(a.target) || B.living("p")[0], th = tg ? home(tg, w, h) : [hx - 60, hy];
+        const mv = a.move, stay = mv && (mv.shot || ["heal", "buff", "guard", "summon", "charge"].includes(mv.k));
+        const tg = unitById(a.target) || B.living("p")[0];
+        let th = tg ? home(tg, w, h) : [hx - 60, hy];
+        if (mv && mv.k === "all") { const ps = partySlots(w, h).slice(0, B.allies().length); th = [ps.reduce((q, p) => q + p[0], 0) / ps.length, ps.reduce((q, p) => q + p[1], 0) / ps.length]; }
+        if (stay) th = [hx + 30, hy];
         const tx = th[0] + 30, ty = th[1];
         const tt = a.t; let f = tt < BTL.T_FOE_LUNGE ? tt / BTL.T_FOE_LUNGE : tt < BTL.T_FOE_LUNGE + BTL.T_FOE_BITE ? 1 : 1 - (tt - BTL.T_FOE_LUNGE - BTL.T_FOE_BITE) / BTL.T_FOE_BACK;
         f = Math.max(0, Math.min(1, f)); f = f * f * (3 - 2 * f);
@@ -466,15 +506,18 @@ function BattleScreen({ G, foes, party, magic, settings = {}, canFlee = true, pr
       }
       return best;
     };
+    let sizeTick = 0;
     const frame = (now) => {
-      { const r = box.getBoundingClientRect(), dpr = window.devicePixelRatio || 1; if (Math.abs(r.width * dpr - view.w * view.scale) > view.scale * 2 || Math.abs(r.height * dpr - view.h * view.scale) > view.scale * 2) resize(); }   // a missed resize (fold/unfold, rotation) never leaves the stage blank
+      if ((++sizeTick & 31) === 0) { const r = box.getBoundingClientRect(), dpr = window.devicePixelRatio || 1; if (Math.abs(r.width * dpr - view.w * view.scale) > view.scale * 2 || Math.abs(r.height * dpr - view.h * view.scale) > view.scale * 2) resize(); }   // a missed resize (fold/unfold, rotation) never leaves the stage blank
       const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now; t += dt;
+      if (B.units.length !== unitN) { unitN = B.units.length; setRev((x) => x + 1); }
       const { w, h } = view;
       /* sim runs while the screen is up and not paused by the result card */
       if (tipRef.current === null) B.step(dt);
       /* events -> floaters and particles */
       for (const e of B.events.splice(0)) {
         const u = unitById(e.id); if (!u) continue;
+        if (typeof battleSfx === "function") battleSfx(e, u);
         const [px, py] = pose(u, w, h), top = py - (u.side === "p" ? 56 : 40 * (u.scale || 1));
         if (e.e === "dmg") {
           floaters.push({ x: px, y: top, text: String(e.amt) + (e.weak ? "!" : ""), col: u.side === "p" ? "#ff9a8a" : e.weak ? "#ffb060" : e.kind === "magic" ? "#ffe08a" : "#fff0c0", t: 0 });
@@ -485,7 +528,8 @@ function BattleScreen({ G, foes, party, magic, settings = {}, canFlee = true, pr
         } else if (e.e === "heal") {
           floaters.push({ x: px, y: top, text: "+" + e.amt, col: "#a8e07a", t: 0 });
           for (let i = 0; i < 10; i++) parts.push({ x: px + (Math.random() - 0.5) * 20, y: py - 10 - Math.random() * 20, vx: 0, vy: -16 - Math.random() * 12, life: 0.7, max: 0.7, c: i % 2 ? "#a8e07a" : "#e0ffc8" });
-        } else if (e.e === "text") floaters.push({ x: px, y: top, text: e.text, col: "#e9d9b4", t: 0, small: true });
+        } else if (e.e === "phase") { floaters.push({ x: px, y: top - 12, text: "!", col: "#ff9a5a", t: 0 }); shake.t = 0.5; shake.a = 4; burst(px, top + 20, 30, ["#ff9a5a", "#ffe0a8", "#ffffff"], 1.5); logLines.push(e.text); if (logLines.length > 3) logLines.shift(); logT = t; }
+        else if (e.e === "text") floaters.push({ x: px, y: top, text: e.text, col: "#e9d9b4", t: 0, small: true });
         else if (e.e === "guard") floaters.push({ x: px, y: top, text: "Guard", col: "#9cc8ff", t: 0, small: true });
         else if (e.e === "rupture") { floaters.push({ x: px, y: top - 8, text: "RUPTURE", col: "#ff7a5a", t: 0 }); shake.t = 0.35; shake.a = 4; burst(px, top + 20, 26, ["#ff7a5a", "#ffb040", "#fff0c0"], 1.4); }
         else if (e.e === "inhale") floaters.push({ x: px, y: top - 4, text: e.name, col: "#c8b8ff", t: 0, small: true });
@@ -526,13 +570,19 @@ function BattleScreen({ G, foes, party, magic, settings = {}, canFlee = true, pr
           const A = set.anims, a = u.act; let img;
           if (u.ko) img = A.dead[Math.min(3, Math.floor(u.anim.t / 0.15))];
           else if (u.anim.n === "hurt") img = A.hurt[Math.min(3, Math.floor(u.anim.t / 0.1))];
-          else if (a && a.kind === "attack") { const tt = a.t - BTL.T_STEP; img = tt < 0 ? A.idle[0] : tt < BTL.T_ATK ? A.attack[Math.min(9, Math.floor(tt / (BTL.T_ATK / 10)))] : A.idle[0]; }
+          let blade = null;
+          if (u.ko || u.anim.n === "hurt") { /* handled above */ }
+          else if (a && a.kind === "attack") { const tt = a.t - BTL.T_STEP; img = tt < 0 ? A.idle[0] : tt < BTL.T_ATK ? A.attack[Math.min(9, Math.floor(tt / (BTL.T_ATK / 10)))] : A.idle[0];
+            if (blades[u.id]) {   // the blade follows the hand through the whole swing, and out again as the fighter steps back
+              const f = tt < 0 ? 0 : tt < BTL.T_ATK ? (tt / BTL.T_ATK) * 10 : 0, fade = tt < 0 ? Math.max(0, 1 + tt / 0.12) : tt < BTL.T_ATK ? 1 : Math.max(0, 1 - (tt - BTL.T_ATK) / 0.16);
+              blade = { f, fade, id: blades[u.id], trail: tt > 0 && tt < BTL.T_ATK && f > 6.2 && f < 9.4 };
+            } }
           else if (a && a.kind === "release") img = A.cast[Math.min(6, 3 + Math.floor(a.t / 0.1))];
           else if (u.cast) img = u.cast.wait ? A.cast[3] : A.cast[Math.floor(t * 6 + u.slot) % 3];
-          else if (a && a.kind === "item") img = A.cast[Math.min(3, Math.floor(a.t / 0.2))];
+          else if (a && (a.kind === "item" || a.kind === "skill")) img = A.cast[Math.min(3, Math.floor(a.t / 0.2))];
           else if (u.guard || (a && a.kind === "defend")) img = A.hurt[0];
           else img = A.idle[Math.floor(t * 5 + u.slot * 2) % A.idle.length];
-          items.push({ u, y: py, x: Math.round(px - set.anchor[0]), yy: Math.round(py - set.anchor[1] - 1), img, sx: px });
+          items.push({ u, y: py, x: Math.round(px - set.anchor[0]), yy: Math.round(py - set.anchor[1] - 1), img, sx: px, blade });
         } else {
           const fr = foeSprite(u), a = u.act, sc = u.scale || 1;
           let img = fr[a && a.t < BTL.T_FOE_LUNGE + BTL.T_FOE_BITE ? 1 : 0];
@@ -540,11 +590,15 @@ function BattleScreen({ G, foes, party, magic, settings = {}, canFlee = true, pr
             const pick = (arr, i) => arr[Math.max(0, Math.min(arr.length - 1, i))];
             if (u.ko && fr.dead) img = pick(fr.dead, Math.floor(u.anim.t / 0.18));
             else if (u.anim.n === "hurt" && fr.hurt) img = pick(fr.hurt, Math.floor(u.anim.t / 0.1));
-            else if (a && a.t < BTL.T_FOE_LUNGE + BTL.T_FOE_BITE) img = pick(fr.attack, Math.floor(a.t / (BTL.T_FOE_LUNGE + BTL.T_FOE_BITE) * fr.attack.length));
+            else if (a && a.t < BTL.T_FOE_LUNGE + BTL.T_FOE_BITE) { const strip = (a.move && a.move.anim && fr[a.move.anim]) || (a.move && a.move.shot && (fr.cast || fr.shot)) || fr.attack; img = pick(strip, Math.floor(a.t / (BTL.T_FOE_LUNGE + BTL.T_FOE_BITE) * strip.length)); }
+            else if (u.stunT > B.t && fr.stun) img = pick(fr.stun, Math.floor((t * 6) % fr.stun.length));
+            else if (u.stunT > B.t) img = fr.hurt ? fr.hurt[0] : fr.idle[0];
+            else if ((u.prot > 0 || u.charging) && fr.guard) img = fr.guard[Math.min(fr.guard.length - 1, 1)];
+            else if (u.charging) img = fr.attack[0];
             else img = fr.idle[Math.floor(t * 5 + u.slot * 2) % fr.idle.length];
           }
           const bob = u.ko ? 0 : Math.sin(t * 2.1 + u.slot) * 0.9;
-          items.push({ u, y: py, img, sc, x: Math.round(px - (img.width * sc) / 2), yy: Math.round(py - img.height * sc + 3 + bob), sx: px });
+          items.push({ u, y: py, img, sc, x: Math.round(px - (img.width * sc) / 2), yy: Math.round(py - img.height * sc + 3 + bob + (fr.foot || 0) * sc), sx: px });
         }
       }
       items.sort((a, b) => a.y - b.y);
@@ -554,6 +608,11 @@ function BattleScreen({ G, foes, party, magic, settings = {}, canFlee = true, pr
         if (u.side === "p") {
           if (u.gauge >= 100 && !u.ko && B.phase === "fight") { ctx.strokeStyle = `rgba(233,217,180,${0.45 + 0.35 * Math.sin(t * 7)})`; ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(it.sx - 3, it.y, 18, 5, 0, 0, Math.PI * 2); ctx.stroke(); }
           ctx.drawImage(it.img, it.x, it.yy);
+          if (it.blade && it.blade.fade > 0) {
+            const bl = it.blade, tint = SWORD_TINT[bl.id];
+            if (bl.trail) for (const [df, al] of [[1.1, 0.14], [0.7, 0.22], [0.35, 0.34]]) { const g = swingPose(bl.f - df); ctx.globalAlpha = al; drawSwordOn(ctx, it.x + g[0], it.yy + g[1], g[2], ["#e3e8ee", "#ffffff"]); }
+            const p0 = swingPose(bl.f); ctx.globalAlpha = bl.fade; drawSwordOn(ctx, it.x + p0[0], it.yy + p0[1], p0[2], tint); ctx.globalAlpha = 1;
+          }
           if (u.cast) {
             const c = u.cast, el = EL_COL[c.spell.el] || EL_COL.force, f = c.wait ? 1 : Math.min(1, c.t / Math.max(0.01, c.spell.charge));
             for (let i = 0; i < 6; i++) { const an = t * 3 + i * 1.05, r = 20 * (1 - f * 0.45) + Math.sin(t * 5 + i) * 2; ctx.fillStyle = el[i % 3]; ctx.globalAlpha = 0.5 + 0.5 * f; ctx.fillRect(Math.round(it.sx - 3 + Math.cos(an) * r), Math.round(it.y - 26 + Math.sin(an) * r * 0.7), 2, 2); }
@@ -568,6 +627,26 @@ function BattleScreen({ G, foes, party, magic, settings = {}, canFlee = true, pr
           const dy = it.yy + it.img.height * it.sc - dh + ko * 4;
           ctx.imageSmoothingEnabled = false;
           ctx.drawImage(it.img, it.x, dy, dw, dh);
+          if (BTL_FOES[u.key] && BTL_FOES[u.key].bow && !u.ko) {   // the bandit's bow, held out toward the party; the string draws back on a shot
+            const a2 = u.act, pull = a2 && a2.move && a2.move.shot && a2.t < BTL.T_FOE_LUNGE ? a2.t / BTL.T_FOE_LUNGE : 0, bx = it.x + dw * 0.26, by = dy + dh * 0.5, r = dh * 0.32;
+            ctx.strokeStyle = "#4a3020"; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(bx + r * 0.55, by, r, Math.PI * 0.62, Math.PI * 1.38); ctx.stroke();
+            ctx.strokeStyle = "#5e4630"; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(bx + r * 0.55, by, r, Math.PI * 0.66, Math.PI * 1.34); ctx.stroke();
+            const sx0 = bx + r * 0.55 + Math.cos(Math.PI * 0.62) * r, sy0 = by + Math.sin(Math.PI * 0.62) * r, sy1 = by - Math.sin(Math.PI * 0.62) * r, nock = sx0 + pull * 6;
+            ctx.strokeStyle = "#cbbfa4"; ctx.beginPath(); ctx.moveTo(sx0, sy0); ctx.lineTo(nock, by); ctx.lineTo(sx0, sy1); ctx.stroke();
+          }
+          if (u.prot > 0 && !u.ko) { ctx.strokeStyle = `rgba(156,200,255,${0.35 + 0.2 * Math.sin(t * 5)})`; ctx.lineWidth = 1; ctx.beginPath(); ctx.ellipse(it.sx, dy + dh * 0.55, dw * 0.42, dh * 0.5, 0, Math.PI * 0.6, Math.PI * 1.4); ctx.stroke(); }
+          const pa = u.act;
+          if (pa && pa.move && pa.move.proj && pa.t > 0.08 && pa.t < BTL.T_FOE_LUNGE) {   // a thrown thing crosses the field and lands on the hit
+            const k = (pa.t - 0.08) / (BTL.T_FOE_LUNGE - 0.08), tgs = pa.move.k === "all" ? B.living("p") : [unitById(pa.target) || B.living("p")[0]];
+            for (const tg of tgs) { if (!tg) continue;
+              const [qx, qy] = pose(tg, w, h), sx0 = it.sx - 10, sy0 = dy + dh * 0.45, ex = qx + 4, ey = qy - 26, x = sx0 + (ex - sx0) * k, y = sy0 + (ey - sy0) * k - Math.sin(k * Math.PI) * (pa.move.proj === "arrow" ? 10 : 16);
+              const P = pa.move.proj;
+              if (P === "arrow") { const ang = Math.atan2(ey - sy0 - Math.cos(k * Math.PI) * 10 * Math.PI, ex - sx0); ctx.strokeStyle = "#d8ccb0"; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - Math.cos(ang) * 10, y - Math.sin(ang) * 10); ctx.stroke(); ctx.fillStyle = "#e8e0d0"; ctx.fillRect(Math.round(x) - 1, Math.round(y) - 1, 2, 2); }
+              else { const col = P === "fire" ? ["#ffb040", "#ff6a2a", "#fff0c0"] : P === "bolt" ? ["#9cf0ff", "#4ab0d0", "#ffffff"] : P === "venom" ? ["#9ad050", "#5a8a2a", "#e0ffa0"] : ["#b080e0", "#6a3aa0", "#e8d0ff"];
+                ctx.fillStyle = col[1]; ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = col[0]; ctx.beginPath(); ctx.arc(x, y, 2.6, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = col[2]; ctx.fillRect(Math.round(x) - 1, Math.round(y) - 1, 2, 2);
+                if (Math.random() < 0.6) parts.push({ x, y, vx: (Math.random() - 0.5) * 10, vy: -6 - Math.random() * 8, life: 0.3, max: 0.3, c: col[Math.floor(Math.random() * 3)] }); }
+            }
+          }
           if (u.anim.n === "hurt" && u.anim.t < 0.25) { ctx.globalAlpha = (1 - u.anim.t / 0.25) * 0.8; ctx.globalCompositeOperation = "lighter"; ctx.drawImage(it.img, it.x, dy, dw, dh); ctx.globalCompositeOperation = "source-over"; }
           ctx.globalAlpha = 1;
         }
@@ -625,10 +704,15 @@ function BattleScreen({ G, foes, party, magic, settings = {}, canFlee = true, pr
       /* DOM HUD */
       const R = refs.current;
       for (const u of B.units) {
-        if (u.side === "e") { const el = R.foeHp[u.id]; if (el) { el.style.width = Math.round((u.hp / u.maxHp) * 100) + "%"; el.parentNode.parentNode.dataset.ko = u.ko ? "1" : "0"; const bd = R.foeBadge[u.id]; if (bd) { const st = u.sleepT > B.t ? "Asleep" : u.slowT > B.t ? "Slowed" : u.markT > B.t ? "Marked" : ""; if (bd.textContent !== st) bd.textContent = st; } } }
+        if (u.side === "e") { const el = R.foeHp[u.id]; if (el) { el.style.width = Math.round((u.hp / u.maxHp) * 100) + "%"; el.parentNode.parentNode.dataset.ko = u.ko ? "1" : "0";
+          if (B.act2) {   // out in the wider world a foe's health is a guess until Sens reads it
+            const box = el.parentNode.parentNode, f = u.hp / u.maxHp, word = u.ko ? "Down" : u.read ? `${u.hp}/${u.maxHp}` : f > 0.99 ? "Unhurt" : f > 0.6 ? "Scratched" : f > 0.3 ? "Wounded" : "Failing";
+            if (box.dataset.read !== (u.read ? "1" : "0")) box.dataset.read = u.read ? "1" : "0";
+            const cw = R.foeCond[u.id]; if (cw && cw.textContent !== word) cw.textContent = word;
+          } const bd = R.foeBadge[u.id]; if (bd) { const st = u.stunT > B.t ? "Stunned" : u.sleepT > B.t ? "Asleep" : u.charging ? "Winding up" : u.prot > 0 ? "Guarding" : u.slowT > B.t ? "Slowed" : u.markT > B.t ? "Marked" : ""; if (bd.textContent !== st) bd.textContent = st; } } }
         else {
           if (R.hp[u.id]) R.hp[u.id].textContent = u.hp + "/" + u.maxHp;
-          if (R.mp[u.id]) R.mp[u.id].textContent = (u.maxMp ? "Breath " + u.mp + "/" + u.maxMp : "") + (u.ward > 0 ? " · Ward " + u.ward : "") + (u.infuse ? " · Infused" : "");
+          if (R.mp[u.id]) R.mp[u.id].textContent = (u.maxMp ? (btlCaster(u.key) ? "Breath " : "Stamina ") + u.mp + "/" + u.maxMp : "") + (u.ward > 0 ? " · Ward " + u.ward : "") + (u.infuse ? " · Infused" : "") + (u.dot ? (u.dot.k === "poison" ? " · Poisoned" : " · Bleeding") : "");
           if (R.hpBar[u.id]) { R.hpBar[u.id].style.width = Math.round((u.hp / u.maxHp) * 100) + "%"; R.hpBar[u.id].dataset.low = u.hp / u.maxHp < 0.3 ? "1" : "0"; }
           const b = R.atb[u.id]; if (b) { b.style.width = Math.round(u.gauge) + "%"; b.dataset.full = u.gauge >= 100 ? "1" : "0"; }
           if (R.row[u.id]) { R.row[u.id].dataset.ko = u.ko ? "1" : "0"; R.row[u.id].dataset.sel = menuRef.current && menuRef.current.id === u.id ? "1" : "0"; }
@@ -665,8 +749,9 @@ function BattleScreen({ G, foes, party, magic, settings = {}, canFlee = true, pr
       <div className="dz-bstage" ref={boxRef}><canvas ref={cvRef} className="dz-bcv" onPointerDown={onStageTap} /></div>
       <div className="dz-btop dz-frame">
         {foeUnits.map((u) => (
-          <div className="dz-bfoe" key={u.id} data-ko="0">
+          <div className="dz-bfoe" key={u.id} data-ko="0" data-read={B.act2 ? "0" : "1"} data-veil={B.act2 ? "1" : "0"}>
             <b>{u.name}</b><span>Lv {u.lv}</span><em className="dz-bbadge" ref={(el) => { refs.current.foeBadge[u.id] = el; }} />
+            {B.act2 ? <em className="dz-bcond" ref={(el) => { refs.current.foeCond[u.id] = el; }}>Unhurt</em> : null}
             <div className="dz-bhp"><i ref={(el) => { refs.current.foeHp[u.id] = el; }} style={{ width: "100%" }} /></div>
           </div>
         ))}
@@ -687,10 +772,19 @@ function BattleScreen({ G, foes, party, magic, settings = {}, canFlee = true, pr
             <>
               <div className="dz-bwho">{mu ? mu.name : ""} <i>· tap an enemy to attack it</i></div>
               <button className="dz-bc" id="dz-c-attack" onClick={() => pickCmd("attack")}>Attack</button>
-              <button className="dz-bc" id="dz-c-magic" disabled={!magic || !known.length} onClick={() => pickCmd("magic")}>Cast</button>
+              {mu && btlCaster(mu.key)
+                ? <button className="dz-bc" id="dz-c-magic" disabled={!magic || !known.length} onClick={() => pickCmd("magic")}>Cast</button>
+                : <button className="dz-bc" id="dz-c-skill" disabled={!(mu && (BTL_ABILITIES[mu.key] || []).length)} onClick={() => pickCmd("skill")}>Abilities</button>}
               <button className="dz-bc" id="dz-c-item" disabled={!itemList.length} onClick={() => pickCmd("item")}>Item</button>
               <button className="dz-bc" id="dz-c-defend" onClick={() => pickCmd("defend")}>Defend</button>
               <button className="dz-bc" id="dz-c-flee" disabled={!canFlee} onClick={() => pickCmd("flee")}>Flee</button>
+            </>
+          ) : null}
+          {menu && menu.stage === "skill" && mu ? (
+            <>
+              <div className="dz-bwho">{mu.name} · Abilities <i>· Stamina {mu.mp}/{mu.maxMp}</i></div>
+              {(BTL_ABILITIES[mu.key] || []).map((ab) => <button key={ab.id} className="dz-bc" id={`dz-k-${ab.id}`} disabled={mu.mp < ab.cost} title={ab.desc} onClick={() => pickSkill(ab)}>{ab.name} <small>{ab.cost} St · {ab.target === "foes" ? "all foes" : ab.target === "allies" ? "the party" : ab.target === "self" ? "self" : "one foe"}</small></button>)}
+              <button className="dz-bc dz-back" id="dz-c-back" onClick={back}>Back</button>
             </>
           ) : null}
           {menu && menu.stage === "spell" ? (
@@ -718,7 +812,7 @@ function BattleScreen({ G, foes, party, magic, settings = {}, canFlee = true, pr
           {menu && menu.stage === "item" ? (
             <>
               <div className="dz-bwho">Items</div>
-              {itemList.map((k) => <button key={k} className="dz-bc" id={`dz-i-${k}`} onClick={() => pickItem(k)}>{BTL_ITEMS[k].name} <small>×{B.items[k]}</small></button>)}
+              {itemList.map((k) => <button key={k} className="dz-bc" id={`dz-i-${k}`} onClick={() => pickItem(k)}>{BTL_ITEMS[k].name} <small>×{B.items[k]} · {btlItemText(k, B.act2)}</small></button>)}
               <button className="dz-bc dz-back" id="dz-c-back" onClick={back}>Back</button>
             </>
           ) : null}
@@ -736,7 +830,7 @@ function BattleScreen({ G, foes, party, magic, settings = {}, canFlee = true, pr
           {heroes.map((u) => (
             <div className="dz-brow" key={u.id} data-sel="0" data-ko="0" ref={(el) => { refs.current.row[u.id] = el; }}
               onClick={() => { if (B.phase === "fight" && u.gauge >= 100 && !u.ko && !u.queued && !u.act) setMenu({ id: u.id, stage: "cmd", pend: null }); }}>
-              <div className="dz-bchip"><PixelImage source={getPortrait(u.look || { chibi: u.key === "companion" ? "companion" : u.key })} crop={[4, 2, 40, 40]} scale={0.7} /></div>
+              <div className="dz-bchip"><PixelImage source={getPortrait(u.look || { chibi: u.key === "companion" ? "companion" : (CHIBI_MAP[u.key] || u.key) })} scale={0.7} /></div>
               <div className="dz-binfo">
                 <div className="dz-bname"><b>{u.name}</b><small>Lv {u.lv}</small><span ref={(el) => { refs.current.hp[u.id] = el; }}>{u.hp}/{u.maxHp}</span></div>
                 <div className="dz-bhp"><i ref={(el) => { refs.current.hpBar[u.id] = el; }} data-low="0" /></div>
@@ -770,7 +864,7 @@ function BattleScreen({ G, foes, party, magic, settings = {}, canFlee = true, pr
                 <div className="dz-ptitle">Victory</div>
                 <div className="dz-reward"><span>+{over.res.xp} XP</span>{over.res.coins ? <span>+{over.res.coins} coppers</span> : null}</div>
                 {Object.keys(over.res.loot).map((k) => <div key={k}>Found: {over.res.loot[k] > 1 ? over.res.loot[k] + " × " : ""}{BTL_ITEMS[k] ? BTL_ITEMS[k].name : ITEMS[k] ? ITEMS[k].name : k}</div>)}
-                {over.ups.map((u, i) => <div key={i} className="dz-lvup">{BTL_PARTY[u.key].name} reached level {u.lv}</div>)}
+                {over.ups.map((u, i) => <div key={i} className="dz-lvup">{(u.key === "wren" && G && G.name) || BTL_PARTY[u.key].name} reached level {u.lv}</div>)}
               </>
             ) : (
               <>

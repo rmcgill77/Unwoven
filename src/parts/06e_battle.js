@@ -6,10 +6,27 @@
 
 /* party members: base stats at level 1 and growth per level. mp is Breath. */
 const BTL_PARTY = {
-  wren: { name: "Wren", role: "Apprentice", base: { hp: 48, mp: 10, atk: 8, mag: 10, def: 5, spd: 11 }, grow: { hp: 7, mp: 1.6, atk: 1.2, mag: 1.8, def: 0.9, spd: 0.4 } },
+  wren: { name: "Corin", role: "Apprentice", caster: true, base: { hp: 48, mp: 10, atk: 8, mag: 10, def: 5, spd: 11 }, grow: { hp: 7, mp: 1.6, atk: 0.5, mag: 1.8, def: 0.9, spd: 0.4 } },   // a caster: the sword arm barely grows, the word does the work
   tessa: { name: "Tessa", role: "Scout", base: { hp: 42, mp: 4, atk: 9, mag: 3, def: 4, spd: 13 }, grow: { hp: 7, mp: 0.6, atk: 1.6, mag: 0.6, def: 1, spd: 0.5 } },
-  companion: { name: "Hooded one", role: "Stranger", base: { hp: 46, mp: 12, atk: 6, mag: 11, def: 4, spd: 9 }, grow: { hp: 8, mp: 2, atk: 1, mag: 2, def: 1, spd: 0.3 } },
+  companion: { name: "Hooded one", role: "Stranger", caster: true, base: { hp: 46, mp: 12, atk: 6, mag: 11, def: 4, spd: 9 }, grow: { hp: 8, mp: 2, atk: 1, mag: 2, def: 1, spd: 0.3 } },
 };
+/* Only casters speak the Old Tongue. Everyone else fights with abilities of their own, paid for in
+   Stamina (the same pool casters call Breath). Attacking or defending wins a point back.
+   pw: strike power against a normal attack. strike: steps in and hits like an attack. */
+const BTL_ABILITIES = {
+  tessa: [
+    { id: "quickcut", name: "Quick Cut", cost: 1, target: "foe", strike: true, pw: 0.8, desc: "A fast, light cut. She is ready again in half the time." },
+    { id: "hamstring", name: "Hamstring", cost: 2, target: "foe", strike: true, pw: 0.7, desc: "A low cut at the legs. The foe is slowed." },
+    { id: "rally", name: "Rally", cost: 3, target: "allies", desc: "A shout that brings everyone on, readying the whole party sooner." },
+  ],
+  hakon: [
+    { id: "cleave", name: "Cleave", cost: 2, target: "foes", strike: true, pw: 0.7, desc: "One wide swing through every foe." },
+    { id: "shieldwall", name: "Shield Wall", cost: 2, target: "self", desc: "He plants his feet and guards, and draws the foes' blows onto himself for a while." },
+    { id: "crush", name: "Crushing Blow", cost: 3, target: "foe", strike: true, pw: 1.7, desc: "A heavy two-handed blow that smashes through a raised guard." },
+  ],
+};
+const btlCaster = (key) => !!(BTL_PARTY[key] && BTL_PARTY[key].caster);
+const btlAbility = (key, id) => (BTL_ABILITIES[key] || []).find((a) => a.id === id) || null;
 const BTL_XP_FOR = (lv) => Math.round(18 * Math.pow(lv, 1.55));      // xp needed to leave this level
 const BTL_MAX_LV = 20;
 const GEAR_SLOTS = [["weapon", "Weapon"], ["head", "Head"], ["body", "Body"], ["charm", "Charm"]];
@@ -17,7 +34,8 @@ const GEAR_STATS = { hp: "HP", mp: "MP", atk: "ATK", mag: "MAG", def: "DEF", spd
 function btlStats(key, lv, eq) {
   const d = BTL_PARTY[key], o = {};
   for (const k in d.base) o[k] = Math.round(d.base[k] + d.grow[k] * (lv - 1));
-  if (eq) for (const slot in eq) { const it = typeof ITEMS !== "undefined" && ITEMS[eq[slot]]; if (it && it.gear) for (const k in GEAR_STATS) if (it.gear[k]) o[k] += it.gear[k]; }
+  o.spell = 0; o.guardK = 0;   // spell: extra spell power from a focus. guardK: how much further a guard turns a blow.
+  if (eq) for (const slot in eq) { const it = typeof ITEMS !== "undefined" && ITEMS[eq[slot]]; if (it && it.gear) { for (const k in GEAR_STATS) if (it.gear[k]) o[k] += it.gear[k]; o.spell += it.gear.spell || 0; o.guardK += it.gear.guard || 0; } }
   return o;
 }
 const btlStatsFor = (G, key, lv) => btlStats(key, lv, G && G.equip && G.equip[key]);
@@ -38,7 +56,22 @@ function btlEnsureParty(G) {
   return G.party;
 }
 
-const BTL_ITEMS = { poultice: { name: "Poultice", heal: 24, desc: "Moss, clay and a clean rag. Heals 24." }, tonic: { name: "Herbal tonic", heal: 40, desc: "Bitter and green. Heals 40." } };
+/* things used in a fight. heal: health. mp: breath. infuse: the next three strikes carry an element. bomb: thrown at every foe.
+   heal2 is what the same thing mends once the wider world's recipes are in use (Act Two). */
+const BTL_ITEMS = {
+  bandage: { name: "Bandage", heal: 14, cure: ["bleed"], desc: "Heals 14 and stops bleeding." },
+  antidote: { name: "Antidote", cure: ["poison"], desc: "Cures poison." },
+  poultice: { name: "Poultice", heal: 24, heal2: 40, desc: "Heals 24.", desc2: "Heals 40." },
+  spoultice: { name: "Strong poultice", heal: 90, desc: "Heals 90." },
+  gpoultice: { name: "Greater poultice", heal: 160, desc: "Heals 160." },
+  tonic: { name: "Herbal tonic", heal: 40, desc: "Heals 40." },
+  ration: { name: "Trail ration", heal: 12, desc: "Heals 12." },
+  btonic: { name: "Breath tonic", mp: 6, desc: "Restores 6 Breath." },
+  gtonic: { name: "Greater tonic", mp: 14, desc: "Restores 14 Breath." },
+  torchoil: { name: "Torch oil", infuse: "fire", desc: "The next three strikes burn." },
+  firepot: { name: "Firewax pot", bomb: 34, el: "fire", foes: true, desc: "Burns every foe." },
+};
+const btlItemText = (k, act2) => { const d = BTL_ITEMS[k]; return d ? (act2 && d.desc2) || d.desc : ""; };
 
 /* enemies. art: which sprite the renderer draws. weak/resist are elements. */
 const BTL_FOES = {
@@ -70,26 +103,29 @@ const BTL = {
   T_FOE_LUNGE: 0.38, T_FOE_BITE: 0.18, T_FOE_BACK: 0.34,
   WIN_DUR: 0.9, WIN_SWEET: [0.46, 0.7], WIN_OK: [0.28, 0.88],   // release window, as fractions of its length
   RUPT_BURN: 3, WEAK: 1.4, RESIST: 0.6, WILD_POWER: 1.2, WILD_MISFIRE: 0.1,
+  MASTERY: 0.04,       // spell power per mastery mark on the root (three marks at most)
   REGEN_BREATH: 0.16,  // breath per second, for everyone
 };
 
 /* ---- simulation ---- */
-function createBattle({ party, foes, items = {}, wait = true, rng = Math.random, canFlee = true, words = null, hotbar = null, ley = { wild: false }, autoRelease = false }) {
-  const B = { t: 0, phase: "fight", units: [], events: [], queue: [], cur: null, items: { ...items }, wait, waiting: false, rng, canFlee, result: null, used: {},
+function createBattle({ party, foes, items = {}, wait = true, rng = Math.random, canFlee = true, words = null, hotbar = null, ley = { wild: false }, autoRelease = false, act2 = false, mastery = null }) {
+  const B = { act2, mastery: mastery || {}, t: 0, phase: "fight", units: [], events: [], queue: [], cur: null, items: { ...items }, wait, waiting: false, rng, canFlee, result: null, used: {},
     words: words || { r: [], s: [] }, hotbar: hotbar || [null, null, null, null], ley, autoRelease, window: null };
   let uid = 1;
   party.forEach((p, i) => {
     const s = btlStats(p.key, p.lv, p.eq);
     B.units.push({ id: uid++, side: "p", slot: i, key: p.key, name: p.name || BTL_PARTY[p.key].name, role: BTL_PARTY[p.key].role, lv: p.lv,
-      hp: Math.min(p.hp, s.hp) || (p.hp <= 0 ? 0 : s.hp), maxHp: s.hp, mp: Math.min(p.mp, s.mp), maxMp: s.mp, atk: s.atk, mag: s.mag, def: s.def, spd: s.spd,
+      hp: Math.min(p.hp, s.hp) || (p.hp <= 0 ? 0 : s.hp), maxHp: s.hp, mp: Math.min(p.mp, s.mp), maxMp: s.mp, atk: s.atk, mag: s.mag, def: s.def, spd: s.spd, spell: s.spell, guardK: s.guardK,
       gauge: 18 + rng() * 40, guard: false, ko: p.hp <= 0, anim: { n: "idle", t: 0 }, act: null, look: p.look, cast: null, ward: 0, infuse: null, breathAcc: 0, slowT: 0, sleepT: 0, markT: 0 });
   });
-  foes.forEach((k, i) => {
+  const addFoe = (k, i) => {
     const d = BTL_FOES[k];
-    B.units.push({ id: uid++, side: "e", slot: i, key: k, name: d.name, lv: d.lv, hp: d.hp, maxHp: d.hp, mp: 0, maxMp: 0, atk: d.atk, mag: 0, def: d.def, spd: d.spd,
+    B.units.push({ id: uid++, side: "e", slot: i, key: k, moves: d.moves || null, misfire: d.misfire || 0, stunBy: d.stunBy || [], prot: d.prot || 0, atkMul: 1, phased: false, charging: null, stunT: 0, pierceProt: false, name: d.name, lv: d.lv, hp: d.hp, maxHp: d.hp, mp: 0, maxMp: 0, atk: d.atk, mag: 0, def: d.def, spd: d.spd,
       gauge: 10 + rng() * 45, guard: false, ko: false, anim: { n: "idle", t: 0 }, act: null, art: d.art, scale: d.scale, tint: d.tint || 0, boss: !!d.boss,
       weak: d.weak || [], resist: d.resist || [], note: d.note, cast: null, ward: 0, infuse: null, slowT: 0, sleepT: 0, markT: 0 });
-  });
+  };
+  foes.forEach((k, i) => addFoe(k, i));
+  B.addFoe = addFoe;
   for (const u of B.units) if (u.ko) { u.anim = { n: "dead", t: 9 }; u.gauge = 0; }
   B.by = (id) => B.units.find((u) => u.id === id);
   B.allies = () => B.units.filter((u) => u.side === "p");
@@ -100,14 +136,19 @@ function createBattle({ party, foes, items = {}, wait = true, rng = Math.random,
   const rnd = (a, b) => a + rng() * (b - a);
   const emit = (e) => B.events.push({ t: B.t, ...e });
 
-  const physical = (a, d, extra = 1) => Math.max(1, Math.round((a.atk * 2 - d.def) * rnd(0.85, 1.15) * extra));
+  const physical = (a, d, extra = 1) => Math.max(1, Math.round((a.atk * (a.atkMul || 1) * 2 - d.def) * rnd(0.85, 1.15) * extra));
   function elemMult(dst, el) { if (!el) return 1; if (dst.weak && dst.weak.includes(el)) return BTL.WEAK; if (dst.resist && dst.resist.includes(el)) return BTL.RESIST; return 1; }
 
   /* ---- taking damage: wards soak it, a hit on a weaving caster is a Rupture ---- */
   function damage(src, dst, amt, kind, el) {
     let rupture = true;
-    if (dst.guard) amt = Math.max(1, Math.round(amt * BTL.GUARD));
+    if (dst.guard) amt = Math.max(1, Math.round(amt * BTL.GUARD * (1 - (dst.guardK || 0))));
     if (dst.markT > B.t) amt = Math.round(amt * 1.25);
+    if (dst.prot > 0) {   // behind a raised shield: storm or a truth working breaks it, anything else glances off
+      if (el === "storm" || el === "mind") { dst.prot = 0; emit({ e: "text", id: dst.id, text: "Guard broken!" }); }
+      else amt = Math.max(1, Math.round(amt * 0.3));
+    }
+    if (dst.side === "e" && el && dst.stunBy && dst.stunBy.includes(el) && !dst.ko) { dst.stunT = B.t + (dst.phased ? 4 : 2.5); dst.gauge = 0; dst.charging = null; emit({ e: "text", id: dst.id, text: dst.art === "robot" ? "Shuts down!" : "Stunned!" }); }
     const em = elemMult(dst, el); if (em !== 1) amt = Math.max(1, Math.round(amt * em));
     if (dst.ward > 0) { const soak = Math.min(dst.ward, amt); dst.ward -= soak; amt -= soak; if (soak) emit({ e: "ward", id: dst.id, amt: soak }); if (amt === 0) rupture = false; }
     if (amt > 0) {
@@ -116,8 +157,29 @@ function createBattle({ party, foes, items = {}, wait = true, rng = Math.random,
       if (dst.hp <= 0) { dst.ko = true; dst.gauge = 0; dst.queued = null; dst.cast = null; dst.sleepT = 0; dst.anim = { n: "dead", t: 0 }; emit({ e: "ko", id: dst.id }); }
       else dst.anim = { n: "hurt", t: 0 };
       if (dst.sleepT > B.t) dst.sleepT = 0;       // a blow wakes the sleeper
+      if (!dst.ko) phaseCheck(dst);
     }
     if (rupture && !dst.ko && dst.cast && !dst.cast.ready && dst.cast.spell.charge > 0) rupt(dst);
+  }
+  /* a named foe changes at half health: it says so, everyone gets a breath, and it fights differently after */
+  function phaseCheck(u) {
+    const d = BTL_FOES[u.key], p2 = d && d.phase2; if (!p2 || u.phased || u.hp > u.maxHp * (p2.at || 0.5)) return;
+    u.phased = true; u.charging = null;
+    if (p2.atk) u.atkMul *= p2.atk; if (p2.def) u.def = Math.max(0, u.def + p2.def); if (p2.spd) u.spd = p2.spd;
+    if (p2.prot !== undefined) u.prot = p2.prot; if (p2.misfire !== undefined) u.misfire = p2.misfire;
+    if (p2.moves) u.moves = p2.moves; if (p2.name) u.name = p2.name;
+    emit({ e: "phase", id: u.id, text: p2.text || "" });
+    for (const f of B.living("e")) f.gauge = Math.min(f.gauge, 20);
+    if (p2.summon) summon(u, p2.summon);
+  }
+  function summon(u, keys) {
+    for (const k of keys) {
+      if (B.living("e").length >= 3) break;
+      const used = new Set(B.living("e").map((f) => f.slot)), slot = [0, 1, 2].find((x) => !used.has(x));
+      if (slot === undefined) break;
+      B.units = B.units.filter((f) => !(f.side === "e" && f.ko && f.slot === slot));
+      addFoe(k, slot); const n = B.units[B.units.length - 1]; n.gauge = 0; emit({ e: "text", id: n.id, text: "Joins the fight!" });
+    }
   }
   function rupt(u) {
     if (B.window && B.window.uid === u.id) B.window = null;
@@ -135,7 +197,13 @@ function createBattle({ party, foes, items = {}, wait = true, rng = Math.random,
     const u = B.by(uid_);
     if (!u || u.side !== "p" || u.ko || u.gauge < 100 || u.queued || u.act || u.cast) return false;
     if (cmd.type === "attack") { const t = B.by(cmd.target); if (!t || t.ko) return false; }
+    if (cmd.type === "skill") {
+      const ab = btlAbility(u.key, cmd.skill); if (!ab || u.mp < ab.cost) return false;
+      if (ab.target === "foe") { const t = B.by(cmd.target); if (!t || t.ko || t.side !== "e") return false; }
+      u.mp -= ab.cost;
+    }
     if (cmd.type === "cast") {
+      if (!btlCaster(u.key)) return false;
       const sp = typeof cmd.spell === "string" ? weaveSpell(...cmd.spell.split("-")) : cmd.spell;
       if (!sp || !sp.ok) return false;
       const [r, s] = [sp.root, sp.suf];
@@ -147,7 +215,7 @@ function createBattle({ party, foes, items = {}, wait = true, rng = Math.random,
       emit({ e: "inhale", id: u.id, name: sp.name });
       return true;
     }
-    if (cmd.type === "item") { if (!(B.items[cmd.item] > 0)) return false; const t = B.by(cmd.target); if (!t || t.ko) return false; B.items[cmd.item]--; B.used[cmd.item] = (B.used[cmd.item] || 0) + 1; }
+    if (cmd.type === "item") { if (!(B.items[cmd.item] > 0) || !BTL_ITEMS[cmd.item]) return false; const t = B.by(cmd.target); if (!BTL_ITEMS[cmd.item].foes && (!t || t.ko)) return false; B.items[cmd.item]--; B.used[cmd.item] = (B.used[cmd.item] || 0) + 1; }
     if (cmd.type === "flee" && !B.canFlee) return false;
     u.queued = cmd; B.queue.push(u.id); return true;
   };
@@ -174,12 +242,19 @@ function createBattle({ party, foes, items = {}, wait = true, rng = Math.random,
       else if (cmd.type === "release") { a.kind = "release"; a.spell = u.cast.spell; a.target = u.cast.target; a.dur = BTL.T_REL; a.hitAt = BTL.REL_HIT; a.quality = u.cast.quality; }
       else if (cmd.type === "item") { u.gauge = 0; a.dur = 0.8; a.hitAt = 0.4; }
       else if (cmd.type === "defend") { u.gauge = 0; a.dur = 0.5; a.hitAt = 0.05; }
+      else if (cmd.type === "skill") {
+        const ab = btlAbility(u.key, cmd.skill); u.gauge = 0; a.skill = ab;
+        if (ab.strike) { a.kind = "attack"; a.dur = BTL.T_STEP + BTL.T_ATK + BTL.T_RETURN; a.hitAt = BTL.T_STEP + BTL.ATK_HIT; }
+        else { a.kind = "skill"; a.dur = 0.8; a.hitAt = 0.4; }
+        emit({ e: "text", id: u.id, text: ab.name + "!" });
+      }
       else if (cmd.type === "flee") { u.gauge = 0; a.dur = 0.9; a.hitAt = 0.5; }
-    } else { u.gauge = 0; a.kind = "bite"; a.dur = BTL.T_FOE_LUNGE + BTL.T_FOE_BITE + BTL.T_FOE_BACK; a.hitAt = BTL.T_FOE_LUNGE; }
+    } else { u.gauge = 0; a.kind = "bite"; a.move = cmd.move || null; a.dur = BTL.T_FOE_LUNGE + BTL.T_FOE_BITE + BTL.T_FOE_BACK; a.hitAt = BTL.T_FOE_LUNGE; }
     u.act = a; B.cur = u.id;
   }
   function spellPower(u, sp, quality) {
     let p = u.mag * sp.pw * 1.9 * quality * rnd(0.92, 1.08);
+    p *= 1 + (u.spell || 0) + (u.key === "wren" ? BTL.MASTERY * (B.mastery[sp.root] || 0) : 0);   // a focus in the hand, and a word studied until it sits right
     if (B.ley.wild) p *= BTL.WILD_POWER;
     return p;
   }
@@ -225,7 +300,8 @@ function createBattle({ party, foes, items = {}, wait = true, rng = Math.random,
       case "mark": {
         const list = sp.target === "foes" ? foes : [pickFoe()].filter(Boolean);
         for (const t of list) {
-          t.markT = B.t + 12;
+          t.markT = B.t + 12; t.read = true;
+          if (t.prot > 0) { t.prot = 0; emit({ e: "text", id: t.id, text: "Guard broken!" }); }   // seen plainly, a guard has no gaps to hide   // read through the senses: its health stays plain for the rest of the fight
           emit({ e: "scan", id: t.id, text: `${t.name}: ${t.hp}/${t.maxHp} HP${t.weak.length ? " · weak to " + t.weak.join(", ") : ""}${t.resist.length ? " · resists " + t.resist.join(", ") : ""}` });
         }
         break;
@@ -234,8 +310,23 @@ function createBattle({ party, foes, items = {}, wait = true, rng = Math.random,
     emit({ e: "cast", id: u.id, name: sp.name, label: a.quality >= 1.2 ? "Clean" : a.quality >= 1 ? "Steady" : "Sloppy" });
     if (B.onSignature) B.onSignature(u, sp);
   }
+  function resolveSkill(u, a, tgt) {
+    const ab = a.skill, foes = B.living("e");
+    let t = tgt && !tgt.ko ? tgt : foes[0];
+    const strike = (x, pw) => { let dmg = physical(u, x, pw), el = null; if (u.infuse && u.infuse.n > 0) { dmg = Math.round(dmg * 1.35); el = u.infuse.el; u.infuse.n--; if (!u.infuse.n) u.infuse = null; } damage(u, x, dmg, "attack", el); };
+    switch (ab.id) {
+      case "quickcut": if (t) { strike(t, ab.pw); u.gauge = 50; } break;
+      case "hamstring": if (t) { strike(t, ab.pw); if (!t.ko) { t.slowT = B.t + 10; emit({ e: "text", id: t.id, text: "Slowed" }); } } break;
+      case "rally": for (const x of B.living("p")) if (x !== u) { x.gauge = Math.min(100, x.gauge + 40); emit({ e: "text", id: x.id, text: "Rallied" }); } break;
+      case "cleave": for (const x of foes) strike(x, ab.pw); break;
+      case "shieldwall": u.guard = true; u.tauntT = B.t + 9; emit({ e: "guard", id: u.id }); emit({ e: "text", id: u.id, text: "Come on, then!" }); break;
+      case "crush": if (t) { if (t.prot > 0) { t.prot = 0; emit({ e: "text", id: t.id, text: "Guard broken!" }); } strike(t, ab.pw); } break;
+    }
+  }
   function resolve(u, a) {
     const tgt = a.target ? B.by(a.target) : null;
+    if (a.kind === "bite" && a.move) { foeMove(u, a, tgt); return; }
+    if (a.skill) { resolveSkill(u, a, tgt); return; }
     if (a.kind === "attack" || a.kind === "bite") {
       let t = tgt;
       if (!t || t.ko) t = B.living(u.side === "p" ? "e" : "p")[0];
@@ -247,7 +338,14 @@ function createBattle({ party, foes, items = {}, wait = true, rng = Math.random,
     } else if (a.kind === "release") {
       resolveSpell(u, a); u.cast = null;
     } else if (a.kind === "item") {
-      if (tgt && !tgt.ko) heal(tgt, BTL_ITEMS[a.item].heal);
+      const it = BTL_ITEMS[a.item];
+      if (it.bomb) { for (const f of B.living("e")) damage(u, f, Math.max(1, Math.round(it.bomb * rnd(0.9, 1.1) - f.def * 0.5)), "magic", it.el); }
+      else if (tgt && !tgt.ko) {
+        if (it.heal) heal(tgt, (B.act2 && it.heal2) || it.heal);
+        if (it.mp) { const m = Math.min(it.mp, tgt.maxMp - tgt.mp); tgt.mp += m; emit({ e: "text", id: tgt.id, text: `+${m} Breath` }); }
+        if (it.infuse) { tgt.infuse = { el: it.infuse, n: 3 }; emit({ e: "infused", id: tgt.id, el: it.infuse }); }
+        if (it.cure && tgt.dot && it.cure.includes(tgt.dot.k)) { emit({ e: "text", id: tgt.id, text: tgt.dot.k === "poison" ? "Poison cured" : "Bleeding stopped" }); tgt.dot = null; }
+      }
     } else if (a.kind === "defend") { u.guard = true; u.mp = Math.min(u.maxMp, u.mp + 1); emit({ e: "guard", id: u.id }); }
     else if (a.kind === "flee") {
       const f = B.living("e"), avg = f.reduce((s, x) => s + x.spd, 0) / Math.max(1, f.length);
@@ -256,13 +354,40 @@ function createBattle({ party, foes, items = {}, wait = true, rng = Math.random,
       else emit({ e: "text", id: u.id, text: "Can't get away!" });
     }
   }
+  /* ---- what a foe does with its turn ---- */
+  function foeMove(u, a, tgt) {
+    const m = a.move, al = B.living("p"); let t = tgt && !tgt.ko ? tgt : al[0];
+    if (u.prot > 0 && m.k !== "guard") u.prot--;   // a raised shield is lowered a little every turn
+    if (u.misfire && m.k !== "charge" && B.rng() < u.misfire) { emit({ e: "text", id: u.id, text: "Misfires!" }); return; }
+    const hitOne = (x, p) => { if (!x || x.ko) return; damage(u, x, physical(u, x, p || 1), "bite", m.el || null); if (m.dot && !x.ko && B.rng() < (m.dotP || 0.6)) { x.dot = { k: m.dot, amt: Math.max(2, Math.round(u.atk * 0.18)), until: B.t + 9, acc: 0 }; emit({ e: "text", id: x.id, text: m.dot === "poison" ? "Poisoned" : "Bleeding" }); } };
+    switch (m.k) {
+      case "two": { const two = [t, ...al.filter((x) => x !== t)].slice(0, 2); for (const x of two) hitOne(x, m.p || 0.8); break; }
+      case "all": for (const x of al) hitOne(x, m.p || 0.7); break;
+      case "heal": { const fs = B.living("e"), w = fs.reduce((b, x) => (x.hp / x.maxHp < b.hp / b.maxHp ? x : b), fs[0]); heal(w, Math.round(w.maxHp * (m.p || 0.14))); break; }
+      case "buff": { for (const f of B.living("e")) f.atkMul = Math.min(1.5, f.atkMul * (m.p || 1.15)); emit({ e: "text", id: u.id, text: m.n + "!" }); break; }
+      case "guard": u.prot = m.p || 3; emit({ e: "text", id: u.id, text: "Raises a guard" }); break;
+      case "summon": summon(u, m.add || []); break;
+      case "charge": u.charging = m.then; emit({ e: "text", id: u.id, text: m.say || "Winds up..." }); break;
+      default: hitOne(t, m.p || 1);
+    }
+  }
   function foeChoose(u) {
     const al = B.living("p"); if (!al.length) return null;
+    const taunter = al.find((x) => x.tauntT > B.t) || null;   // Shield Wall: the blows go to him
+    if (u.moves) {
+      const tPick = () => { let t = al[Math.floor(B.rng() * al.length)]; if (B.rng() < 0.3) t = al.reduce((m, x) => (x.hp / x.maxHp < m.hp / m.maxHp ? x : m), al[0]); if (taunter && B.rng() < 0.75) t = taunter; return t; };
+      if (u.charging) { const mv = u.charging; u.charging = null; return { type: "attack", target: tPick().id, move: mv }; }
+      const ok = u.moves.filter((m) => (m.k !== "heal" || B.living("e").some((f) => f.hp < f.maxHp * 0.7)) && (m.k !== "guard" || u.prot <= 0) && (m.k !== "summon" || B.living("e").length < 3) && (m.k !== "buff" || u.atkMul < 1.45));
+      let r = B.rng() * ok.reduce((x, m) => x + (m.w || 1), 0), mv = ok[0];
+      for (const m of ok) { r -= m.w || 1; if (r <= 0) { mv = m; break; } }
+      return { type: "attack", target: tPick().id, move: mv };
+    }
     let t = al[Math.floor(B.rng() * al.length)];
     if (B.rng() < 0.3) t = al.reduce((m, x) => (x.hp / x.maxHp < m.hp / m.maxHp ? x : m), al[0]);
     // beasts go for the one who is weaving
     const weaver = al.find((x) => x.cast && !x.cast.ready && x.cast.spell.charge > 0);
     if (weaver && B.rng() < 0.35) t = weaver;
+    if (taunter && B.rng() < 0.75) t = taunter;
     return { type: "attack", target: t.id };
   }
 
@@ -287,9 +412,14 @@ function createBattle({ party, foes, items = {}, wait = true, rng = Math.random,
           }
         }
         if (u.act || u.cast) continue;
-        if (u.sleepT > B.t) continue;
+        if (u.sleepT > B.t || u.stunT > B.t) continue;
         const slow = u.slowT > B.t ? 0.5 : 1;
         if (u.gauge < 100) u.gauge = Math.min(100, u.gauge + u.spd * BTL.RATE * dt * slow * (u.side === "e" ? BTL.FOE_SLOW : 1));
+      }
+      /* poison and bleeding: a little every second, never the last of it */
+      for (const u of B.living("p")) if (u.dot) {
+        if (B.t > u.dot.until) { u.dot = null; continue; }
+        u.dot.acc += dt; if (u.dot.acc >= 1) { u.dot.acc -= 1; const n = Math.min(u.dot.amt, u.hp - 1); if (n > 0) { u.hp -= n; emit({ e: "dmg", id: u.id, amt: n, kind: "dot", el: u.dot.k === "poison" ? "growth" : null }); } }
       }
       /* breath comes back slowly */
       for (const u of B.units) if (u.side === "p" && !u.ko && u.mp < u.maxMp) { u.breathAcc += BTL.REGEN_BREATH * dt; if (u.breathAcc >= 1) { u.breathAcc -= 1; u.mp++; } }
@@ -300,7 +430,7 @@ function createBattle({ party, foes, items = {}, wait = true, rng = Math.random,
       if (w) { B.window = { uid: w.id, t: 0 }; }
     }
     /* foes whose gauge is full queue themselves */
-    for (const u of B.units) if (u.side === "e" && !u.ko && !u.act && u.gauge >= 100 && !u.queued && u.sleepT <= B.t) { const c = foeChoose(u); if (c) { u.queued = c; B.queue.push(u.id); } }
+    for (const u of B.units) if (u.side === "e" && !u.ko && !u.act && u.gauge >= 100 && !u.queued && u.sleepT <= B.t && u.stunT <= B.t) { const c = foeChoose(u); if (c) { u.queued = c; B.queue.push(u.id); } }
     if (B.cur === null && B.queue.length) {
       while (B.queue.length) {
         const u = B.by(B.queue.shift());
@@ -345,7 +475,7 @@ function btlApply(G, res) {
   for (const k in res.used) { G.items[k] = Math.max(0, (G.items[k] || 0) - res.used[k]); if (!G.items[k]) delete G.items[k]; }
   if (res.phase === "won") {
     G.coins += res.coins;
-    for (const k in res.loot) G.items[k] = (G.items[k] || 0) + res.loot[k];
+    for (const k in res.loot) G.items[k] = Math.min(999, (G.items[k] || 0) + res.loot[k]);
     const alive = res.members.filter((m) => !m.ko).length || 1;
     for (const m of res.members) {
       const r = G.party[m.key]; if (!r) continue;

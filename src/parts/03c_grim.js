@@ -176,6 +176,28 @@ function mudColor(wx, wy) {
   if (gnoise(wx, wy, 13, 11) > 0.85) return GP.wet;
   return v < 0.28 ? GP.m0 : v > 0.74 ? GP.m2 : GP.m1;
 }
+/* town paving: the craftpix pack's stones laid in rows of seamless strips, recoloured grim and dirtied stone by stone.
+   rf is the road field at the pixel: the middle of a street is whole cobble, the edges break into loose stones and mud. */
+const PAVE_PAL = {
+  ash: [["#2c2824", "#46403a", "#686056", "#7a7264", "#857c6c"], ["#2a2622", "#3e3a34", "#5a544c", "#6a6458", "#746c5e"], ["#2a2a22", "#3e4232", "#56603e", "#646c48", "#6c7450"]],
+  grey: [["#26282c", "#3c4046", "#545a62", "#666c74"], ["#24262a", "#363a3e", "#4a4e54", "#585c62"], ["#262a24", "#3a4034", "#4e5844", "#5c6650"]],
+};
+function paveColor(style, wx, wy, rf) {
+  const P = PAVE[style], pals = PAVE_PAL[style];
+  if (!P || !pals) return null;
+  const sx = wx >> 1, sy = wy >> 1, row = sy >> 4, strip = P.strips[gh(row, 0, 611 + style.length) % P.strips.length];
+  const L = strip[0].length, off = gh(row, 1, 612) % L;
+  const rank = +strip[sy & 15][(sx + off) % L];
+  // which stone is this: cells of about 6 by 6 source pixels, so a whole cobble is tinted together
+  const cell = gh((sx + off) / 6 | 0, (sy / 6 | 0) + row * 7, 613);
+  const edge = rf < 0.5, moss = gnoise(wx, wy, 26, 615) > 0.66 && cell % 3 === 0;
+  if (edge && (cell % 5 < (rf < 0.44 ? 4 : 2) || gnoise(wx, wy, 7, 614) > 0.7)) return null;   // stones lifted or sunk at the street's edge
+  if (style === "grey" && (gnoise(wx, wy, 20, 618) > 0.68 || cell % 11 === 0)) return null;      // a broken street: whole patches gone to mud
+  let col = (moss ? pals[2] : cell % 7 === 0 ? pals[1] : pals[0])[rank];
+  if (rank <= 1 && gnoise(wx, wy, 11, 616) > 0.55) col = GP.m0;                               // dirt packed into the joints
+  if (rank >= 2 && gnoise(wx, wy, 18, 617) > 0.72) col = mix(col, "#3e3428", 0.35);           // grime trodden over the stones
+  return col;
+}
 function bladesInto(b, tx, ty) {   // short grass blades, some pale and dead, scattered across a grass tile
   for (let k = 0; k < 6; k++) {
     const x = tx * GT + (gh(tx, ty, 20 + k) % 28) + 2, y = ty * GT + (gh(tx, ty, 30 + k) % 26) + 5;
@@ -339,6 +361,120 @@ function sprBarricade(v) {
   s.line([[6, 18], [10, 34]], "#5a5a5e");   // nails and wire
   return s.outline().canvas();
 }
+/* The town gate, one tile of it. Shut: planks under iron straps. Open: a post with the leaf folded back against it. */
+function sprGate(open, lower) {
+  const s = new PB(40, 60);
+  if (open) {   // a heavy post with an iron cap, and the leaf swung back flat against the hedge side
+    const y0 = lower ? 6 : 2, y1 = lower ? 58 : 50;
+    s.poly([[20, y0 + 10], [36, y0 + (lower ? 16 : 4)], [36, y1 - (lower ? 2 : 14)], [20, y1 - 4]], "#4a3626");
+    for (let k = 0; k < 3; k++) s.line([[24 + k * 4, y0 + 9 - (lower ? -k * 2 : k * 2)], [24 + k * 4, y1 - 5 - (lower ? -k : k * 3)]], "#3a2a1c");
+    s.line([[20, y0 + 16], [36, y0 + (lower ? 21 : 10)]], "#3a3640", 2); s.line([[20, y1 - 12], [36, y1 - (lower ? 9 : 21)]], "#3a3640", 2);
+    s.rect(9, y0 + 3, 20, y1, GP.woodD); s.rect(9, y0 + 3, 12, y1, GP.wood); s.rect(9, y0 + 3, 9, y1, GP.woodL);
+    s.rect(7, y0, 22, y0 + 4, "#3a3640"); s.rect(7, y0, 22, y0, "#6a6670"); s.rect(8, y1 - 6, 21, y1 - 4, "#3a3640");
+    return s.outline().canvas();
+  }
+  for (let x = 2; x < 38; x += 6) { s.rect(x, 12 + (gh(x, 3) % 2), x + 4, 58, GP.wood); s.line([[x, 13], [x, 58]], GP.woodL); s.line([[x + 4, 13], [x + 4, 58]], GP.woodD); }
+  s.rect(0, 20, 39, 24, "#3a3640"); s.rect(0, 44, 39, 48, "#3a3640"); s.rect(0, 20, 39, 20, "#6a6670"); s.rect(0, 44, 39, 44, "#6a6670");
+  for (const x of [5, 19, 33]) { s.rect(x, 21, x + 1, 22, "#8a8690"); s.rect(x, 45, x + 1, 46, "#8a8690"); }
+  s.rect(0, 8, 39, 12, GP.woodD); s.rect(0, 8, 39, 8, GP.woodL);
+  return s.outline().canvas();
+}
+/* Odile's stone: tall, plainly cut, with a guild seal and three lines nobody could agree on. Yarrow and a turnip at the foot. */
+function sprMemorial() {
+  const s = new PB(44, 70), c0 = "#6c6a6c", c1 = "#86848a", c2 = "#4a484c";
+  s.rect(10, 18, 33, 64, c0); s.ell(10, 4, 33, 30, c0); s.rect(10, 18, 13, 64, c1); s.rect(30, 18, 33, 64, c2);
+  s.ell(16, 11, 27, 22, c2); s.ell(18, 13, 25, 20, c0); s.line([[21, 14], [21, 19]], c2, 2); s.line([[19, 17], [24, 17]], c2);   // the guild seal
+  for (const [y, a, b] of [[30, 15, 28], [36, 16, 27], [42, 15, 25], [48, 17, 28]]) s.line([[a, y], [b, y]], c2);
+  s.rect(5, 63, 38, 68, "#4e4c4e"); s.rect(5, 63, 38, 63, c1);
+  for (let x = 10; x < 33; x++) if (gh(x, 5, 3) % 4 === 0) s.set(x, 62 - (gh(x, 2) % 4), GP.moss);
+  for (const [x, h] of [[2, 10], [5, 13], [8, 9]]) { s.line([[x, 68], [x, 68 - h]], "#4a5a34"); s.ell(x - 2, 66 - h, x + 2, 69 - h, "#d8d4c0"); }   // yarrow
+  s.ell(34, 61, 41, 68, "#8a5a7c"); s.ell(35, 62, 38, 65, "#a6749a"); s.line([[37, 61], [39, 56]], "#4a6a40", 2);   // Edda's turnip
+  return s.outline().canvas();
+}
+/* A Pillar lashed under a filthy tarp: folds, ropes, pegs, and a thin seam of ley-light where the hem lifts */
+function sprTarp() {
+  const W = 84, H = 166, s = new PB(W, H), cx = 42, C = ["#2a2a20", "#3a3a2a", "#4a4834", "#58553e"];
+  const half = (y) => 14 + (y / H) * 26 + Math.sin(y * 0.11) * 1.5;            // narrow at the sheared top, wide at the plinth
+  for (let y = 6; y < H - 4; y++) {
+    const h = half(y);
+    for (let x = Math.round(cx - h); x <= Math.round(cx + h); x++) {
+      const f = Math.sin((x - cx) * 0.42 + y * 0.03) + Math.sin((x + y * 0.5) * 0.13);   // vertical folds
+      const col = f > 1.1 ? C[3] : f > 0.2 ? C[2] : f > -0.8 ? C[1] : C[0];
+      s.set(x, y, gnoise(x, y, 7, 911) > 0.82 ? "#2e2a20" : col);
+    }
+  }
+  s.poly([[cx - 14, 6], [cx + 12, 2], [cx + 16, 10], [cx - 15, 12]], C[1]);   // the cloth bunched over the top
+  for (const [y, sl] of [[40, 3], [86, 4], [128, -3]]) {                        // rope lashings, wrapped round
+    const h = half(y);
+    s.line([[cx - h, y], [cx + h, y + sl]], "#8a7650", 2); s.line([[cx - h, y + 1], [cx + h, y + sl + 1]], "#5a4a30");
+    s.ell(cx + h - 4, y + sl - 2, cx + h + 2, y + sl + 4, "#8a7650");
+  }
+  for (let x = cx - 36; x < cx + 36; x += 3) if (gnoise(x, 0, 3, 912) > 0.45) s.set(x, H - 5, "#7ad0c8");   // light leaking under the hem
+  for (const px of [cx - 40, cx + 38]) { s.line([[px, H - 6], [px + (px < cx ? 6 : -6), H - 22]], "#5a4a30"); s.rect(px - 1, H - 6, px + 1, H - 2, "#3a2c20"); }   // guy ropes and pegs
+  for (let k = 0; k < 6; k++) { const x = cx - 20 + k * 8, y = 60 + (k * 37) % 70; s.ell(x, y, x + 5, y + 3, "#4a3a28"); }   // mud stains
+  return s.outline().canvas();
+}
+/* The Covenant's flag on a street pole: purple, weathered, the gold sigil (a ring bound by a single thread).
+   Two frames, the cloth swinging a little in the wind. */
+const COV = { p0: "#2e1a3a", p1: "#4a2a5c", p2: "#5e3a72", g0: "#8a6a2a", g1: "#c8a24a" };
+function covSigil(s, cx, cy, r) {
+  s.ell(cx - r, cy - r, cx + r, cy + r, COV.g1); s.ell(cx - r + 2, cy - r + 2, cx + r - 2, cy + r - 2, COV.p1);
+  s.line([[cx, cy - r - 2], [cx, cy + r + 2]], COV.g1); s.set(cx + 1, cy + r + 2, COV.g0);
+}
+const UNB = { p0: "#6a5418", p1: "#9a7c26", p2: "#b8963a", g0: "#5a1a14", g1: "#9a2a20" };
+/* the Unbound's mark: a red thread, snapped, its two ends curling away */
+function unbSigil(s, cx, cy, r) {
+  s.line([[cx - r, cy + r], [cx - 1, cy]], UNB.g1, 2); s.line([[cx + 1, cy - 1], [cx + r, cy - r]], UNB.g1, 2);
+  s.set(cx - 1, cy - 1, UNB.g1); s.set(cx + 2, cy + 1, UNB.g1); s.set(cx - r - 1, cy + r - 1, UNB.g0); s.set(cx + r + 1, cy - r + 1, UNB.g0);
+}
+function sprBanner(f, fac) {
+  const s = new PB(30, 78), sw = f ? 2 : 0, P = fac === "u" ? UNB : COV;
+  s.rect(3, 4, 5, 76, "#3a2c20"); s.rect(3, 4, 3, 76, "#5a4630"); s.ell(1, 0, 7, 6, COV.g0); s.set(4, 2, COV.g1);   // the pole and its gilt knob
+  s.rect(5, 8, 26, 9, "#3a2c20");                                                                                      // the crossbar
+  const L = 7, R = 25, top = 10, bot = 50;
+  s.poly([[L, top], [R, top], [R + sw, bot - 6], [L + 9 + sw, bot], [L + sw, bot - 6]], P.p1);                        // a swallowtail, swinging
+  s.poly([[L, top], [L + 4, top], [L + 4 + sw, bot - 4], [L + sw, bot - 6]], P.p2);
+  s.poly([[R - 4, top], [R, top], [R + sw, bot - 6], [R - 4 + sw, bot - 4]], P.p0);
+  s.rect(L, top, R, top + 2, P.g0);
+  if (fac === "u") { unbSigil(s, 16 + (sw >> 1), 26, 5); for (const [x, y] of [[10, 18], [22, 40], [14, 44]]) s.rect(x + sw, y, x + 2 + sw, y + 1, "#4a3a12"); }   // patched, and patched again
+  else covSigil(s, 16 + (sw >> 1), 25, 5);
+  for (const [x, y] of [[10, 38], [20, 31], [12, 44]]) s.rect(x + sw, y, x + 1 + sw, y + 1, "#3a2244");                // stains and moth holes
+  s.rect(0, 74, 9, 77, "#4a4642");
+  return s.outline().canvas();
+}
+/* A market stall: trestle, goods and a striped awning; at night its owner leaves it covered */
+function sprStall(v) {
+  const s = new PB(64, 62), aw = [["#6a2a2a", "#c8b894"], ["#2e4a3a", "#c8b894"], ["#4a2a5c", "#c8a24a"]][v % 3];
+  for (const x of [4, 57]) { s.rect(x, 14, x + 2, 60, "#3a2c20"); s.rect(x, 14, x, 60, "#5a4630"); }
+  for (let k = 0; k < 6; k++) { const x = 1 + k * 10.5; s.poly([[x, 6], [x + 10.5, 6], [x + 11, 20], [x - 0.5, 20]], aw[k % 2]); s.ell(x - 0.5, 17, x + 11, 23, aw[k % 2]); }
+  s.rect(0, 4, 63, 7, "#3a2c20");
+  s.rect(2, 38, 61, 44, "#5a4630"); s.rect(2, 38, 61, 38, "#7a6040"); s.rect(4, 44, 59, 46, "#2e2218");
+  const goods = [["#8a5a2a", "#a87038"], ["#4a6a34", "#6a8a44"], ["#8a8a92", "#a8a8b0"]][v % 3];
+  for (let k = 0; k < 6; k++) { const x = 6 + k * 9; s.ell(x, 30 + (k % 2) * 2, x + 8, 38, goods[k % 2]); s.set(x + 3, 32 + (k % 2) * 2, "#d8c8a0"); }
+  s.rect(10, 48, 22, 59, "#5a4630"); s.rect(10, 48, 22, 49, "#7a6040"); s.ell(36, 50, 50, 60, "#7a6a4a"); s.line([[38, 52], [48, 52]], "#5a4a32");   // crate and sack beneath
+  return s.outline().canvas();
+}
+/* A house going back up: posts, beams and rafters, pegged but not yet walled, with a ladder left against it. */
+function sprFrame() {
+  const s = new PB(96, 84), d = GP.woodD, m = GP.wood, l = GP.woodL;
+  const post = (x, y0) => { s.rect(x, y0, x + 4, 82, m); s.rect(x, y0, x, 82, l); s.rect(x + 4, y0, x + 4, 82, d); };
+  for (const x of [4, 32, 60, 87]) post(x, 36);
+  s.rect(2, 34, 93, 38, m); s.rect(2, 34, 93, 34, l); s.rect(2, 38, 93, 38, d);
+  s.rect(4, 58, 91, 60, d);
+  for (const [a, b] of [[4, 32], [32, 60], [60, 87]]) s.line([[a + 4, 58], [b, 40]], d, 2);          // braces
+  for (const x of [6, 34, 62, 88]) { s.line([[x, 36], [48, 6]], m, 3); s.line([[x, 35], [48, 5]], l); }   // rafters to the ridge
+  s.rect(46, 4, 50, 36, m); s.rect(46, 4, 46, 36, l);
+  for (let y = 44; y < 82; y += 7) s.line([[70, y], [78, y]], d);                                    // ladder
+  s.line([[70, 40], [70, 82]], l, 2); s.line([[78, 40], [78, 82]], d, 2);
+  for (const [x, y] of [[6, 36], [34, 36], [62, 36], [89, 36], [48, 8]]) s.set(x, y, "#2a1e14");     // pegs
+  return s.outline().canvas();
+}
+function sprTimber() {
+  const s = new PB(58, 26);
+  for (let r = 0; r < 4; r++) { const y = 22 - r * 5, x0 = 2 + r * 2, x1 = 55 - (r % 2) * 5; s.rect(x0, y - 3, x1, y, r % 2 ? "#8a6a42" : "#9a7a4e"); s.rect(x0, y - 3, x1, y - 3, "#b8946a"); s.rect(x1 - 1, y - 2, x1, y, "#d8b888"); s.line([[x0 + 9, y - 2], [x1 - 6, y - 2]], "#7a5c38"); }
+  s.rect(0, 23, 57, 25, "#3a2a1c"); s.rect(24, 1, 33, 4, "#5a5a5e");   // a bearer under it, a stone on top
+  return s.outline().canvas();
+}
 function sprPillar() {
   /* An ancient monolith: sheared top, weathered grain, worn rune-grooves with a faint ley glow, moss and ivy climbing from a sunken plinth. */
   const W = 76, H = 168, s = new PB(W, H), cx = 38;
@@ -483,7 +619,25 @@ function sprRefuse() {
 
 
 /* ---------- interior dressing ---------- */
-function sprChest() {
+/* A chest: shut (0), the lid lifting (1), and thrown back on its hinges with nothing left inside (2). */
+function sprChest(f) {
+  if (f) {
+    const s = new PB(30, 34), top = 18;
+    if (f === 1) {   // lid cracked: a dark gap under it
+      s.rect(1, top, 28, 33, "#5a3e26"); s.rect(1, top, 28, top + 2, "#1a120c");
+      s.poly([[1, top - 1], [3, top - 9], [26, top - 9], [28, top - 1]], "#6a4a2e"); s.poly([[3, top - 9], [26, top - 9], [25, top - 6], [4, top - 6]], "#7e5a38");
+      for (const x of [5, 23]) { s.rect(x, top - 9, x + 2, top - 1, "#3a3640"); s.rect(x, top + 3, x + 2, 33, "#3a3640"); s.rect(x, top + 3, x, 33, "#5a5660"); }
+    } else {         // lid upright behind the box, its pale underside showing; the inside is dark and empty
+      s.poly([[2, top], [3, 2], [26, 2], [27, top]], "#4a3220"); s.poly([[4, top - 1], [5, 4], [24, 4], [25, top - 1]], "#5e4630");
+      s.rect(3, 2, 26, 3, "#7e5a38");
+      for (const x of [6, 22]) { s.rect(x, 2, x + 1, top - 1, "#3a3640"); }
+      s.rect(1, top, 28, 33, "#5a3e26"); s.rect(2, top, 27, top + 4, "#140e0a"); s.rect(3, top + 4, 26, top + 4, "#2a1e14");
+      for (const x of [5, 23]) { s.rect(x, top + 5, x + 2, 33, "#3a3640"); s.rect(x, top + 5, x, 33, "#5a5660"); }
+    }
+    s.rect(1, 25, 28, 26, "#3a3640"); s.rect(13, 23, 16, 28, "#6a5e3a"); s.set(14, 25, "#2a2420");
+    if (f === 2) { s.rect(13, 23, 16, 24, "#3a3640"); s.rect(14, 27, 15, 29, "#6a5e3a"); }   // the hasp hangs loose
+    return s.outline().canvas();
+  }
   const s = new PB(30, 24);
   s.rect(1, 8, 28, 23, "#5a3e26"); s.rect(1, 8, 28, 10, "#6e4e30");
   s.poly([[1, 9], [3, 2], [26, 2], [28, 9]], "#6a4a2e"); s.poly([[3, 2], [26, 2], [25, 5], [4, 5]], "#7e5a38");
@@ -805,11 +959,64 @@ const GPROP = {
   dresser: () => sprDresser(), fireplace: (f) => sprFireplace(f), barrel: () => sprBarrel(), crate: (v) => sprCrate(v), sack: () => sprSack(),
   plant: () => sprPlant(), forge: (f) => sprForge(f), anvil: () => sprAnvil(), desk: () => sprDesk(), bench: () => sprBench(), rack: () => sprRack(),
   lantern: () => { const s = new PB(18, 30); s.line([[9, 0], [9, 7]], "#2a2a30"); s.rect(4, 8, 13, 26, "#2a2a30"); s.rect(6, 10, 11, 24, "#d89038"); s.rect(6, 10, 11, 12, "#f6d080"); s.poly([[3, 8], [9, 4], [15, 8]], "#2a2a30"); s.rect(5, 26, 12, 28, "#2a2a30"); return s.outline().canvas(); },
-  chest: () => sprChest(), books: () => sprBooks(), jugs: () => sprJugs(), cauldron: () => sprCauldron(), candles: () => sprCandles(), straw: () => sprStraw(),
+  chest: (f) => sprChest(f), books: () => sprBooks(), jugs: () => sprJugs(), cauldron: () => sprCauldron(), candles: () => sprCandles(), straw: () => sprStraw(),
   herbs: (v) => sprHerbs(v), painting: (v) => sprPainting(v), mirror: () => sprMirror(), shelfw: () => sprShelfW(), tools: () => sprTools(), cloths: () => sprCloths(), firewood: () => sprFirewood(),
   baskets: () => sprBaskets(), block: () => sprBlock(), well: () => sprWell(), lamp: (lit) => sprLamp(lit), board: () => sprBoard(),
   firepit: () => sprFirePit(), leanto: () => sprLeanTo(), deadlog: () => sprDeadLog(), bones: () => sprBones(),
+  memorial: () => sprMemorial(), frame: () => sprFrame(), timber: () => sprTimber(),
+  banner: (f) => sprBanner(f), ubanner: (f) => sprBanner(f, "u"), stall: (v) => sprStall(v), tarp: () => sprTarp(),
+  wagon: (v) => sprWagon(v), sentry: () => sprSentry(), shrine: () => sprShrine(), grate: () => sprGrate(), dummy: () => sprDummy(),
 };
+/* A straw practice man on a post: a sack tunic, a sack head with a charcoal face, straw out of every thrust. */
+function sprDummy() {
+  const s = new PB(28, 54);
+  s.rect(12, 30, 15, 53, GP.woodD); s.rect(12, 30, 12, 53, GP.wood); s.rect(3, 22, 24, 25, GP.wood);
+  s.ell(6, 16, 21, 40, "#8a7a4e"); s.ell(8, 18, 19, 38, "#a08e5a"); s.rect(7, 24, 20, 36, "#6a5a3a");
+  s.ell(8, 2, 19, 16, "#b8a878"); s.line([[11, 8], [12, 8]], "#2a2622"); s.line([[15, 8], [16, 8]], "#2a2622"); s.line([[11, 12], [16, 11]], "#2a2622");
+  for (const [x, y] of [[5, 22], [22, 23], [10, 32], [17, 28], [14, 37]]) { s.line([[x, y], [x + 2, y - 3]], "#d8c890"); }
+  s.rect(10, 51, 17, 53, "#3a3228");
+  return s.outline().canvas();
+}
+/* A covered wagon, side-on: a canvas tilt on hoops over a plank bed, two big wheels. v 3 is the burned-out supply cart. */
+function sprWagon(v) {
+  const s = new PB(70, 50), burnt = v === 3, tilt = [["#8a826c", "#a29a82"], ["#6e6a5a", "#888270"], ["#7a6a52", "#94846a"], ["#2a2622", "#3a3430"]][v % 4];
+  if (!burnt) { s.poly([[6, 30], [8, 10], [14, 4], [56, 4], [62, 10], [64, 30]], tilt[0]); s.poly([[10, 28], [11, 11], [16, 7], [54, 7], [59, 11], [60, 28]], tilt[1]);
+    for (const x of [18, 32, 46]) s.line([[x, 6], [x, 29]], "#5a5446"); s.rect(10, 6, 60, 8, "#c8ccd6"); }
+  else { for (const x of [12, 30, 48]) { s.line([[x, 30], [x + 2, 10]], "#2a221c", 2); } s.poly([[8, 30], [62, 30], [58, 24], [12, 22]], "#3a3026"); }
+  s.rect(4, 30, 66, 36, burnt ? "#2e2620" : GP.wood); s.rect(4, 30, 66, 31, burnt ? "#3a3028" : GP.woodL); s.rect(4, 36, 66, 37, GP.woodD);
+  s.line([[66, 34], [70, 40]], GP.woodD, 2);
+  for (const cx of [16, 54]) { s.ell(cx - 9, 31, cx + 9, 49, "#2a2018"); s.ell(cx - 7, 33, cx + 7, 47, burnt && cx > 30 ? "#14100c" : "#5a4630"); s.ell(cx - 2, 38, cx + 2, 42, "#2a2018");
+    for (let k = 0; k < 4; k++) { const a = k * Math.PI / 4; s.line([[cx + Math.cos(a) * 7, 40 + Math.sin(a) * 7], [cx - Math.cos(a) * 7, 40 - Math.sin(a) * 7]], "#3a2c20"); } }
+  if (burnt) s.poly([[48, 36], [62, 36], [64, 44], [50, 46]], "#1a1612");   // a wheel gone, the bed down on that side
+  return s.outline().canvas();
+}
+/* A Covenant sentry box: a narrow plank hut with a pitched cap, the sigil painted on the side, a brazier beside it. */
+function sprSentry() {
+  const s = new PB(36, 62);
+  s.rect(4, 16, 26, 60, "#4a4446"); s.rect(4, 16, 6, 60, "#5e585a"); s.rect(8, 24, 22, 58, "#16141a");
+  s.poly([[1, 18], [15, 4], [29, 18]], "#2e2a36"); s.poly([[3, 17], [15, 6], [15, 17]], "#3e3848"); s.line([[1, 18], [15, 4], [29, 18]], "#c8ccd6");
+  s.rect(10, 30, 20, 40, "#6a5a7a"); s.ell(12, 32, 18, 38, "#c8b46a");
+  s.rect(28, 44, 35, 49, "#2a2a30"); s.rect(30, 49, 33, 60, "#2a2a30"); s.ell(28, 40, 35, 46, "#e08838"); s.set(31, 41, "#f8d080");
+  return s.outline().canvas();
+}
+/* A wayside shrine: a stone post with a little gabled niche, a lamp gone out inside, offerings frozen to the ledge. */
+function sprShrine() {
+  const s = new PB(30, 56);
+  s.rect(9, 26, 21, 54, GP.stoneD); s.rect(9, 26, 11, 54, GP.stone); s.rect(5, 50, 25, 55, GP.stoneD);
+  s.rect(5, 10, 25, 28, GP.stone); s.rect(9, 14, 21, 26, "#1a181e"); s.poly([[3, 12], [15, 2], [27, 12]], "#3a3842"); s.line([[3, 12], [15, 2], [27, 12]], "#d0d4de");
+  s.rect(13, 19, 17, 25, "#5a5a62"); s.rect(14, 20, 16, 22, "#8a7a5a");
+  s.rect(6, 28, 24, 29, "#d0d4de"); s.set(8, 27, "#8a2a2a"); s.set(21, 27, "#6a6a3a");
+  return s.outline().canvas();
+}
+/* A culvert grate where the Fort's kitchen runoff leaves under the wall: iron bars over black water, rust down the stone. */
+function sprGrate() {
+  const s = new PB(34, 28);
+  s.rect(0, 0, 33, 27, "#3a383e"); s.rect(3, 3, 30, 24, "#0c0b0e");
+  for (let x = 5; x < 30; x += 5) { s.rect(x, 3, x + 1, 24, "#5e5c64"); s.set(x, 3, "#8a8890"); }
+  s.rect(3, 12, 30, 13, "#4e4c54"); s.line([[10, 24], [12, 27]], "#7a4a2a"); s.line([[24, 24], [25, 27]], "#7a4a2a");
+  s.rect(4, 20, 29, 23, "#1e2a30");
+  return s.canvas();
+}
 
 /* ---------- buildings ---------- */
 /* A building is drawn from its footprint in the map: roof rows above, one wall row with windows (w) and a door (D). */
@@ -829,12 +1036,23 @@ function sprBuilding(opt, night) {
     watch: { roof: ["#2a1a20", "#4a2a34", "#643a46"], wall: ["#6c6a68", "#7e7c7a", "#54524e"], thatch: false },
     stable: { roof: ["#5a4a22", "#7e6a30", "#9a843c"], wall: ["#7a5e3e", "#8e7048", "#64492e"], thatch: true },
     carter: { roof: ["#2e2e28", "#464438", "#5c5a48"], wall: ["#8a7858", "#9c8a68", "#70603f"], thatch: false },
+    outpost: { roof: ["#1c1824", "#2a2436", "#3a3248"], wall: ["#6e6a66", "#807c78", "#58544f"], thatch: false },
+    apoth: { roof: ["#22301e", "#34482c", "#465e3a"], wall: ["#9a8a6a", "#ac9c7a", "#806e50"], thatch: false },
+    tailor: { roof: ["#3a2232", "#5a3448", "#72465c"], wall: ["#a49072", "#b6a282", "#887458"], thatch: false },
+    mill: { roof: ["#4a4028", "#6a5a36", "#82703f"], wall: ["#7c6e5a", "#8e806a", "#625646"], thatch: true },
+    lamphouse: { roof: ["#26241e", "#38352a", "#4a4636"], wall: ["#8e8064", "#a09274", "#74684e"], thatch: false },
+    boarded: { roof: ["#222428", "#34363e", "#464a54"], wall: ["#7a766c", "#8c887c", "#5e5a52"], thatch: false },
+    inn: { roof: ["#3a2a1c", "#54402a", "#6a5236"], wall: ["#8a7a5c", "#9c8c6c", "#706246"], thatch: true },
   }[kind];
   const thatch = KP ? KP.thatch : (style === "hovel" || style === "timber");
   const roofDark = KP ? KP.roof[0] : thatch ? "#4a4028" : "#2e3036", roofMid = KP ? KP.roof[1] : thatch ? "#5e5032" : "#3c4046", roofLit = KP ? KP.roof[2] : thatch ? "#6e5e3c" : "#4a4e56";
   // chimney for warm houses
-  if (style !== "hovel") { const cx = W - 34; s.rect(cx, 0, cx + 16, roofH * 0.7, "#4e4c4e"); s.rect(cx, 0, cx + 4, roofH * 0.7, "#625f62"); s.rect(cx - 2, 0, cx + 18, 4, "#3a383a"); }
   const peak = 6, eave = wallTop;
+  if (style !== "hovel") {   // the stack rises from the roof: its foot runs down under the slope so it never floats
+    const cx = W - 34, roofY = (x) => peak + Math.max(0, (x - (W / 2 + 6)) / (W / 2 + 4)) * (eave - peak);
+    const foot = Math.ceil(roofY(cx + 16)) + 3, top = Math.max(0, Math.round(roofY(cx)) - 30);
+    s.rect(cx, top, cx + 16, foot, "#4e4c4e"); s.rect(cx, top, cx + 4, foot, "#625f62"); s.rect(cx - 2, top, cx + 18, top + 4, "#3a383a");
+  }
   s.poly([[2, eave], [W / 2 + 6, peak], [W + 10, eave]], roofMid);
   s.poly([[2, eave], [W / 2 + 6, peak], [W / 2 + 6, eave]], roofLit);
   if (style === "hovel") s.poly([[W / 2 + 10, peak + 20], [W / 2 + 36, peak + 28], [W / 2 + 30, eave - 6], [W / 2 + 8, eave - 12]], "#4a4028");   // patch
@@ -942,6 +1160,51 @@ function sprBuilding(opt, night) {
   } else if (kind === "stable") {     // hay bales, a horseshoe over the door
     s.rect(6, base - 14, 26, base - 2, "#c8a850"); s.rect(6, base - 8, 26, base - 7, "#8a6a2a"); s.rect(10, base - 24, 30, base - 14, "#d4b45c"); s.rect(10, base - 19, 30, base - 18, "#8a6a2a");
     s.ell(dxp + 4, tdoor - 18, dxp + 20, tdoor - 2, "#a8a8b4"); s.ell(dxp + 7, tdoor - 15, dxp + 17, tdoor - 2, "#2a2418");
+  } else if (kind === "outpost") {    // the Covenant's house: long purple banners with the gold sigil, a carved lintel, steps
+    const bxs = [dxp - 34, dxp + 44]; if (W > 260) bxs.push(18, W - 20);
+    for (const x of bxs) {
+      if (x < 8 || x > W - 10) continue;
+      s.rect(x - 2, eave + 6, x + 16, eave + 9, "#2a2218"); s.rect(x, eave + 9, x + 14, eave + 50, COV.p1); s.rect(x, eave + 9, x + 2, eave + 50, COV.p2); s.rect(x + 12, eave + 9, x + 14, eave + 50, COV.p0);
+      s.poly([[x, eave + 50], [x + 7, eave + 43], [x + 14, eave + 50]], COV.p1); s.rect(x, eave + 9, x + 14, eave + 11, COV.g0);
+      covSigil(s, x + 7, eave + 24, 4);
+    }
+    s.rect(dxp - 10, base - 5, dxp + 34, base, "#8a8682"); s.rect(dxp - 6, base - 9, dxp + 30, base - 5, "#7a7672");
+    s.rect(dxp - 8, tdoor - 8, dxp + 32, tdoor - 3, "#9a9690"); s.poly([[dxp - 8, tdoor - 8], [dxp + 12, tdoor - 20], [dxp + 32, tdoor - 8]], "#8a8682");
+    covSigil(s, dxp + 12, tdoor - 11, 3);
+  } else if (kind === "apoth") {      // drying herbs under the eaves and a mortar sign
+    for (let k = 0; k < 5; k++) { const x = 14 + k * 9; s.line([[x, eave + 8], [x, eave + 18]], "#3a2c20"); s.ell(x - 3, eave + 16, x + 3, eave + 26, k % 2 ? "#5a6a3a" : "#7a6a3a"); }
+    const x = Math.min(W - 30, dxp + 38), y = eave + 14;
+    s.rect(x - 4, y - 4, x + 28, y - 2, "#2a1a10"); s.rect(x - 1, y + 2, x + 26, y + 22, "#3a2a1c"); s.rect(x, y + 3, x + 25, y + 21, "#6a5238");
+    s.poly([[x + 6, y + 9], [x + 19, y + 9], [x + 16, y + 18], [x + 9, y + 18]], "#b8b4a8"); s.line([[x + 15, y + 5], [x + 20, y + 12]], "#7a5a3a", 2);
+  } else if (kind === "tailor") {     // a bolt of cloth and a pair of shears on the board
+    const x = Math.min(W - 30, dxp + 38), y = eave + 14;
+    s.rect(x - 4, y - 4, x + 28, y - 2, "#2a1a10"); s.rect(x - 1, y + 2, x + 26, y + 22, "#3a2a1c"); s.rect(x, y + 3, x + 25, y + 21, "#6a5238");
+    s.rect(x + 4, y + 7, x + 12, y + 18, "#7a3a5a"); s.rect(x + 4, y + 7, x + 12, y + 8, "#9a5a7a");
+    s.ell(x + 15, y + 13, x + 19, y + 17, "#a8a8b4"); s.ell(x + 19, y + 13, x + 23, y + 17, "#a8a8b4"); s.line([[x + 17, y + 13], [x + 22, y + 5]], "#a8a8b4"); s.line([[x + 21, y + 13], [x + 16, y + 5]], "#a8a8b4");
+  } else if (kind === "mill") {       // sacks of meal and a millstone leant on the wall
+    s.ell(8, base - 30, 34, base - 4, "#7a7672"); s.ell(18, base - 20, 24, base - 14, "#4a4642");
+    for (const x of [W - 40, W - 26]) { s.ell(x, base - 18, x + 14, base - 2, "#b4a682"); s.line([[x + 3, base - 14], [x + 11, base - 14]], "#8a7c5c"); }
+  } else if (kind === "lamphouse") {  // the Unbound's house: a yellow lamp burning by the door day and night, their banner, a lamp in every window
+    const lx = dxp + 32, ly = tdoor - 6;
+    s.rect(lx - 2, ly - 10, lx + 12, ly - 8, "#2a2218"); s.rect(lx + 4, ly - 8, lx + 5, ly - 4, "#2a2218");
+    s.rect(lx, ly - 4, lx + 9, ly + 10, "#2a2218"); s.rect(lx + 2, ly - 2, lx + 7, ly + 8, "#f0c040"); s.rect(lx + 3, ly - 1, lx + 6, ly + 2, "#fff0a0");
+    for (const wx of wins) { const x = wx - 11; s.rect(x + 3, eave + 15, x + 19, eave + 15 + Math.min(26, base - eave - 26) - 6, "#d8a830"); }
+    const bx = Math.max(10, dxp - 34);
+    s.rect(bx - 2, eave + 6, bx + 16, eave + 9, "#2a2218"); s.rect(bx, eave + 9, bx + 14, eave + 46, UNB.p1); s.rect(bx, eave + 9, bx + 2, eave + 46, UNB.p2);
+    s.poly([[bx, eave + 46], [bx + 7, eave + 40], [bx + 14, eave + 46]], UNB.p1); unbSigil(s, bx + 7, eave + 24, 4);
+  } else if (kind === "boarded") {    // a Covenant chapel, shut: planks nailed over door and windows, the sigil chiselled off the gable
+    const cx = Math.round(W / 2 + 6);
+    s.ell(cx - 9, peak + 36, cx + 9, peak + 54, "#2a2624"); s.line([[cx - 10, peak + 38], [cx + 10, peak + 52]], "#5a4430", 3); s.line([[cx - 10, peak + 52], [cx + 10, peak + 38]], "#4e3c2c", 3);
+    s.rect(cx - 3, peak + 10, cx + 3, peak + 26, "#5e5a52");                                   // where the sigil was
+    for (const wx of wins) { const x = wx - 11; for (let k = 0; k < 3; k++) s.line([[x - 3, eave + 14 + k * 8], [x + 25, eave + 16 + k * 8]], k % 2 ? "#4e3c2c" : "#5a4430", 3); }
+    for (let k = 0; k < 4; k++) s.line([[dxp - 4, tdoor + 4 + k * 8], [dxp + 28, tdoor + 6 + k * 8]], k % 2 ? "#4e3c2c" : "#5a4430", 3);
+    s.rect(dxp + 6, tdoor + 10, dxp + 18, tdoor + 22, "#c8b894"); s.line([[dxp + 8, tdoor + 13], [dxp + 16, tdoor + 13]], "#6a5a4a"); s.line([[dxp + 8, tdoor + 17], [dxp + 14, tdoor + 17]], "#6a5a4a");   // a notice: by order, closed
+  } else if (kind === "inn") {        // a hanging sign with a bed on it, and a lantern
+    const x = Math.min(W - 24, dxp + 38), y = eave + 12;
+    s.rect(x - 6, y - 4, x + 26, y - 2, "#2a1a10"); s.rect(x + 1, y - 2, x + 2, y + 3, "#2a1a10"); s.rect(x + 21, y - 2, x + 22, y + 3, "#2a1a10");
+    s.rect(x - 1, y + 3, x + 24, y + 20, "#3a2214"); s.rect(x, y + 4, x + 23, y + 19, "#5a3a22");
+    s.rect(x + 4, y + 10, x + 19, y + 15, "#c8b894"); s.rect(x + 4, y + 8, x + 8, y + 10, "#e8e0c8"); s.rect(x + 3, y + 8, x + 4, y + 16, "#2a1a10"); s.rect(x + 19, y + 11, x + 20, y + 16, "#2a1a10");
+    s.rect(dxp - 16, tdoor + 4, dxp - 12, tdoor + 14, "#2a1e14"); s.rect(dxp - 18, tdoor + 14, dxp - 10, tdoor + 22, "#c89040");
   } else if (kind === "carter") {     // a wheel on the wall
     const x = Math.min(W - 30, dxp + 38), y = eave + 12;
     s.ell(x, y, x + 24, y + 24, "#5a4028"); s.ell(x + 3, y + 3, x + 21, y + 21, "#2e2218"); s.ell(x + 10, y + 10, x + 14, y + 14, "#8a6a3a");
@@ -1101,22 +1364,26 @@ function bakeGrimMap(id, def, cells, w, h, props, trade) {
   const b = new PB(W, H);
   const at = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? null : cells[y][x]);
   const talls = [], lightsOut = [];
-  const ROAD = new Set(["=", "P", "Z", "S"]), WATER = new Set(["~"]);
+  const ROAD = new Set(["=", "P", "Z", "S", "G", "g"]), WATER = new Set(["~"]);
   const BUILD = new Set(["R", "W", "w", "D"]);
-  const isRoad = (x, y) => { const c = at(x, y); return c === "=" || c === "P" || c === "Z" || c === "B"; };
+  const isRoad = (x, y) => { const c = at(x, y); return c === "=" || c === "P" || c === "Z" || c === "B" || c === "G" || c === "g"; };
   const isWater = (x, y) => { const c = at(x, y); return c === "~" || c === "B"; };
   bakeGrimMap.rat = 0; bakeGrimMap.clear = []; bakeGrimMap.flames = [];
-  const hi = (img, x, y, sortY, extra) => talls.push({ hi: true, img, x, y, sortY, ...(extra || {}) });   // x,y in world units
+  const snowy = def.snowY0 !== undefined;
+  const hi = (img, x, y, sortY, extra) => {   // x,y in world units; on the snowy plains, things wear a cap of snow
+    if (snowy && img) { const sn = snowAtTile(def, Math.floor((sortY || y) / TILE)); if (sn > 0.12) img = snowCapped(img, sn); }
+    talls.push({ hi: true, img, x, y, sortY, ...(extra || {}) });
+  };
 
   if (def.outside) {
     /* ground, roads, water, crops: painted pixel by pixel in world coordinates.
        Water, roads and cliffs are read from smooth fields rather than tile edges, so shores, trails and rock rims
        curve instead of stepping tile by tile. */
-    const isWaterC = (c) => c === "~" || c === "B", isRoadC = (c) => c === "=" || c === "P" || c === "Z" || c === "B" || c === "D", isCliffC = (c) => c === "C" || c === "O";
+    const isWaterC = (c) => c === "~" || c === "B", isRoadC = (c) => c === "=" || c === "P" || c === "Z" || c === "B" || c === "D" || c === "G" || c === "g", isCliffC = (c) => c === "C" || c === "O";
     const WF = tileField(cells, w, h, isWaterC), RF = tileField(cells, w, h, isRoadC), CF = tileField(cells, w, h, isCliffC);
     bakeGrimMap.CF = CF; bakeGrimMap.RF = RF; bakeGrimMap.WF = WF;
     const nearTile = (test, tx, ty, r) => { for (let j = -r; j <= r; j++) for (let i = -r; i <= r; i++) { const c = at(clamp(tx + i, 0, w - 1), clamp(ty + j, 0, h - 1)); if (test(c)) return true; } return false; };
-    const WP = id === "wood" ? WATER_PAL.bog : WATER_PAL.town, town = id === "oak";
+    const WP = id === "wood" ? WATER_PAL.bog : WATER_PAL.town, town = id === "oak" || !!def.town;
     for (let ty = 0; ty < h; ty++) for (let tx = 0; tx < w; tx++) {
       const c = cells[ty][tx];
       const nW = nearTile(isWaterC, tx, ty, 1), nR = nearTile(isRoadC, tx, ty, 1), nR2 = town && nearTile(isRoadC, tx, ty, 2);
@@ -1130,7 +1397,9 @@ function bakeGrimMap(id, def, cells, w, h, props, trade) {
         }
         if (!col && (nR || nR2) && c !== "~") {
           const rf = RF(wx, wy) + (gnoise(wx, wy, 7, 172) - 0.5) * 0.16;
-          if (rf > 0.36) col = mudColor(wx, wy);
+          if (def.pave && rf > 0.38) col = paveColor(def.pave, wx, wy, rf);
+          if (col) {}
+          else if (rf > 0.36) col = mudColor(wx, wy);
           else if (rf > 0.31) col = gnoise(wx, wy, 3, 174) > 0.5 ? GP.m0 : GP.gmud;   // a ragged lip of trodden earth
           else if (town && rf > 0.12 && gnoise(wx, wy, 13, 175) * (rf + 0.4) > 0.36) col = gnoise(wx, wy, 4, 176) > 0.55 ? GP.gmud : GP.dead;   // grass worn thin beside the roads
         }
@@ -1169,7 +1438,7 @@ function bakeGrimMap(id, def, cells, w, h, props, trade) {
         }
       }
       const r = gh(tx, ty, 7);
-      if (r % 5 === 0 && bakeGrimMap.RF(tx * GT + 16, ty * GT + 16) > 0.55) {
+      if (!def.pave && r % 5 === 0 && bakeGrimMap.RF(tx * GT + 16, ty * GT + 16) > 0.55) {
         const cx = tx * GT + (gh(tx, ty, 8) % 16) + 8, cy = ty * GT + (gh(tx, ty, 9) % 14) + 9;
         b.poly([[cx - 7, cy], [cx - 4, cy - 3], [cx + 3, cy - 3], [cx + 7, cy + 1], [cx + 2, cy + 3], [cx - 5, cy + 3]], GP.wet);
         b.poly([[cx - 5, cy], [cx - 3, cy - 2], [cx + 3, cy - 2], [cx + 5, cy + 1], [cx - 4, cy + 2]], GP.pud); b.line([[cx - 3, cy - 1], [cx + 1, cy - 1]], GP.pudL);
@@ -1257,7 +1526,7 @@ function bakeGrimMap(id, def, cells, w, h, props, trade) {
       const style0 = to === "hall" || (to === "shop" && trade === "smith") ? "stone" : to === "store" ? "timber" : to === "tavern" ? "timber" : to === "shop" ? "timber" : "hovel";
       const kind0 = to === "shop" ? (trade === "smith" ? "smithy" : "workshop") : to === "store" ? "store" : to === "hall" ? "hall" : to === "tavern" ? "tavern" : "";
       const dk = door && (def.doorKinds || {})[`${door[0]},${door[1]}`];
-      const style = dk ? (dk === "chapel" || dk === "watch" ? "stone" : "timber") : style0;
+      const style = dk ? (dk === "chapel" || dk === "watch" || dk === "outpost" || dk === "boarded" ? "stone" : dk === "shack" ? "hovel" : "timber") : style0;
       const kind = dk || kind0;
       const BW = tw * GT, BH = th * GT;
       const opt = { W: BW - 12, H: BH, roofH: Math.round(BH * 0.52), wins: bd.wins.map((x) => (x - bd.x0) * GT + 10), door: door ? (door[0] - bd.x0) * GT + 10 : null, style, seed: bd.x0 * 7 + bd.y0, kind, trade };
@@ -1313,7 +1582,8 @@ function bakeGrimMap(id, def, cells, w, h, props, trade) {
         const ox = tx * GT + GT - img.width / 2, oy = (ty + 1) * GT - img.height + 2;
         hi(img, ox / WZ, oy / WZ, ty * TILE + 1);
       } else if (c === "T") {
-        const kind = def.terrain === "rock" ? "dead" : r % 10 < 5 ? "pine" : r % 10 < 8 ? "leafy" : "dead", v = r % 4;
+        const sn = snowAtTile(def, ty);
+        const kind = def.terrain === "rock" ? "dead" : sn > 0.5 ? (r % 10 < 7 ? "pine" : "dead") : sn > 0.1 ? (r % 10 < 4 ? "pine" : r % 10 < 6 ? "leafy" : "dead") : r % 10 < 5 ? "pine" : r % 10 < 8 ? "leafy" : "dead", v = r % 4;
         const img = gsprite(`tree_${kind}${v}`, () => (kind === "pine" ? sprTreePine(v) : kind === "leafy" ? sprTreeLeafy(v) : sprTreeDead(v)));
         const ox = (gh(tx, ty, 2) % 13) - 6, ox2 = tx * GT + 16 - img.width / 2 + ox, oy = ty * GT + 28 - img.height - (gh(tx, ty, 4) % 9);
         castShadow(b, img, ox2, oy, 14, 5, 0.3);
@@ -1351,13 +1621,20 @@ function bakeGrimMap(id, def, cells, w, h, props, trade) {
       } else if (c === "Z") {
         const img = gsprite("barricade" + (r % 2), () => sprBarricade(r % 2)), ox = tx * GT - 2, oy = ty * GT + 32 - img.height;
         castShadow(b, img, ox, oy, 6, 4, 0.38); hi(img, ox / WZ, oy / WZ, ty * TILE + 15);
+      } else if (c === "g") {
+        const img = gsprite("gate_shut", () => sprGate(false)), ox = tx * GT - 4, oy = ty * GT + 34 - img.height;
+        castShadow(b, img, ox, oy, 6, 4, 0.38); hi(img, ox / WZ, oy / WZ, ty * TILE + 15);
+      } else if (c === "G") {   // an open gate: the leaves stand back against the posts, and the road runs between
+        const lower = at(tx, ty - 1) === "G" || at(tx, ty - 1) === "g", pair = lower || at(tx, ty + 1) === "G";
+        const img = gsprite("gate_open" + (lower ? 1 : 0), () => sprGate(true, lower)), ox = tx * GT - 4, oy = pair ? (lower ? ty * GT + 4 : ty * GT - 34) : ty * GT + 32 - img.height;
+        castShadow(b, img, ox, oy, 6, 4, 0.38); hi(img, ox / WZ, oy / WZ, (oy + img.height) / WZ - 1);
       }
     }
-    if (def.pillar) {
-      const img = gsprite("pillar", sprPillar), px = def.pillar.x * WZ - img.width / 2, py = 18 * GT + 6 - img.height;
-      pillarGround(b, def.pillar.x * WZ, 18 * GT - 4);
+    for (const pl of pillarList(def)) {
+      const img = gsprite("pillar", sprPillar), px = pl.x * WZ - img.width / 2, py = pl.base * WZ + 6 - img.height;
+      pillarGround(b, pl.x * WZ, pl.base * WZ - 4);
       castShadow(b, img, px, py, 14, 6, 0.3);
-      hi(img, px / WZ, py / WZ, 18 * TILE - 2);
+      hi(img, px / WZ, py / WZ, pl.base - 2);
     }
     /* trampled, ash-smeared earth where people have camped */
     for (const cp of def.camps || []) {
@@ -1514,7 +1791,8 @@ function bakeGrimMap(id, def, cells, w, h, props, trade) {
     const ref = img || (frames ? frames[0] : lit[1]);
     const fwp = d.fw * GT, x2 = p.x * GT + (fwp - ref.width) / 2, y2 = (p.y + d.fh) * GT - ref.height - (d.wall ? 0 : 2);
     if (def.outside && p.p === "well") wellGround(b, p, bakeGrimMap.RF, d.fw);
-    if (!d.wall && p.p !== "straw") {
+    const pickable = (p.p === "herbpatch" || p.p === "bloom") && !!p.id;
+    if (!d.wall && p.p !== "straw" && !pickable && !p.goneFlag) {
       castShadow(b, ref, Math.round(x2), y2, 6, 4, def.outside ? 0.38 : 0.3); contactBand(b, Math.round(x2) + 2, Math.round(x2) + ref.width - 2, y2 + ref.height - 4, 5, def.outside ? 0.5 : 0.3);
       if (def.outside) {   // worn earth around the foot, with grass and stones growing up against it
         const cxp = Math.round(x2 + ref.width / 2), byp = y2 + ref.height - 3;
@@ -1528,9 +1806,108 @@ function bakeGrimMap(id, def, cells, w, h, props, trade) {
       }
     }
     const entry = { hi: true, img, frames, lit, x: x2 / WZ, y: y2 / WZ, sortY: d.wall ? -1 : d.deco ? p.y * TILE + 2 : (p.y + d.fh) * TILE - 2 };
+    if (pickable) entry.prop = { p: p.p, id: p.id };
+    if (p.goneFlag) entry.prop = { p: p.p, id: p.id, goneFlag: p.goneFlag };
+    if (p.p === "chest" && p.id) { entry.prop = { p: "chest", id: p.id }; entry.open = [img, sc(gsprite("p_chest_o1", () => make(1)), "p_chest_o1"), sc(gsprite("p_chest_o2", () => make(2)), "p_chest_o2")]; }
     talls.push(entry);
   }
+  if (def.outside && def.snowY0 !== undefined) snowGround(b, def, w, h);
+  if (def.fort) fortWalls(b, def, cells, w, h);
   return { base: (() => { const c = b.canvas(); return c; })(), talls, lights: lightsOut, clear: bakeGrimMap.clear, flames: bakeGrimMap.flames };
+}
+
+/* ---------- the Fort's curtain wall, seen from the Outskirts ---------- */
+/* Wall tiles are F and gate tiles H. A tile is wall-walk (grey flags under snow, a parapet along any open edge) unless
+   it is one of the two lowest rows of its column of wall, which together make the face: slate-dark coursed stone
+   under a crenellated top, arrow slits, frost in the joints and a drift of snow at the foot. Gates are dark arches with
+   a portcullis down (shut) on a south face, and iron-strapped timber doors where they sit in the wall-walk. */
+function fortWalls(b, def, cells, w, h) {
+  const at = (x, y) => (y >= 0 && y < h && x >= 0 && x < w ? cells[y][x] : null), isF = (c) => c === "F" || c === "H";
+  const mix = (a, c, t) => [a[0] + (c[0] - a[0]) * t, a[1] + (c[1] - a[1]) * t, a[2] + (c[2] - a[2]) * t];
+  const SL = [[46, 48, 58], [56, 58, 68], [66, 68, 78], [38, 38, 46]], MORT = [28, 28, 34], SNOW = [214, 218, 228], FLAG = [[88, 86, 92], [98, 96, 102], [78, 76, 84]];
+  const put = (x, y, c) => b.set(x, y, c);
+  // runs of gate tiles, so an arch spans the whole gate
+  const gateSpan = (tx, ty) => { let a = tx, z = tx; while (at(a - 1, ty) === "H") a--; while (at(z + 1, ty) === "H") z++; return [a, z]; };
+  for (let ty = 0; ty < h; ty++) for (let tx = 0; tx < w; tx++) {
+    const c = at(tx, ty); if (!isF(c)) continue;
+    const below1 = isF(at(tx, ty + 1)), below2 = isF(at(tx, ty + 2));
+    const role = !below1 ? "lo" : !below2 ? "hi" : "walk", X0 = tx * GT, Y0 = ty * GT;
+    if (role === "walk") {
+      for (let py = 0; py < GT; py++) for (let px = 0; px < GT; px++) {
+        const wx = X0 + px, wy = Y0 + py, row = Math.floor(wy / 12), sx = Math.floor((wx + (row % 2) * 9) / 18);
+        let col = FLAG[(sx * 7 + row * 3) % 3];
+        if (wy % 12 === 0 || (wx + (row % 2) * 9) % 18 === 0) col = [60, 58, 66];
+        col = mix(col, [50, 48, 54], gnoise(wx, wy, 6, 611) * 0.35);
+        const sn = gnoise(wx, wy, 10, 612) * 0.7 + gnoise(wx, wy, 3, 613) * 0.3;
+        col = mix(col, [150, 154, 166], 0.18);                                                               // a rime over everything
+        const edge = Math.min(py, GT - 1 - py) < 5 || Math.min(px, GT - 1 - px) < 5;                           // snow banks against the parapets and in the joints
+        if (sn > (edge ? 0.5 : 0.66)) col = mix(col, SNOW, Math.min(0.85, (sn - (edge ? 0.5 : 0.66)) * 4));
+        put(wx, wy, col);
+      }
+      if (c === "H") {   // timber doors set in the wall-walk: the north gate, seen from outside
+        const [a, z] = gateSpan(tx, ty), gx0 = a * GT + 4, gx1 = (z + 1) * GT - 5;
+        for (let py = 2; py < GT - 2; py++) for (let px = 0; px < GT; px++) {
+          const wx = X0 + px; if (wx < gx0 || wx > gx1) continue;
+          let col = (wx - gx0) % 8 < 1 ? [42, 30, 22] : [78 + ((wx >> 3) % 2) * 8, 58, 40];
+          if ((Y0 + py) % 22 < 3) col = [58, 58, 66];
+          if ((Y0 + py) % 22 === 1 && (wx - gx0) % 8 === 4) col = [120, 120, 128];
+          put(wx, Y0 + py, mix(col, SNOW, gnoise(wx, Y0 + py, 4, 615) > 0.8 ? 0.6 : 0));
+        }
+      }
+      // parapets: a low crenellated lip wherever the walk meets open ground on its left, right or above
+      const lip = (horiz, x0, y0, len, out) => {
+        for (let i = 0; i < len; i++) for (let k = 0; k < 6; k++) {
+          const merl = (Math.floor(((horiz ? x0 : y0) + i) / 8) % 2) === 0, tall = merl ? 6 : 3;
+          if (k >= tall) continue;
+          const x = horiz ? x0 + i : x0 + (out < 0 ? k : GT - 1 - k), y = horiz ? y0 + (out < 0 ? k : GT - 1 - k) : y0 + i;
+          put(x, y, k === tall - 1 || (horiz ? false : false) ? (merl ? SNOW : [180, 184, 194]) : k === 0 ? SL[3] : SL[1]);
+        }
+      };
+      if (!isF(at(tx, ty - 1))) lip(true, X0, Y0, GT, -1);
+      if (!isF(at(tx - 1, ty))) lip(false, X0, Y0, GT, -1);
+      if (!isF(at(tx + 1, ty))) lip(false, X0, Y0, GT, 1);
+      continue;
+    }
+    // the face: two tiles of coursed stone; "hi" carries the crenellations, "lo" the footing and drift
+    const faceTop = role === "hi" ? Y0 : Y0 - GT;
+    for (let py = 0; py < GT; py++) for (let px = 0; px < GT; px++) {
+      const wx = X0 + px, wy = Y0 + py, fy = wy - faceTop, course = Math.floor(fy / 8), bx = Math.floor((wx + (course % 2) * 8) / 16);
+      let col = SL[(bx * 5 + course * 3) % 3];
+      if (fy % 8 === 7 || (wx + (course % 2) * 8) % 16 === 15) col = MORT;
+      else if (fy % 8 === 0) col = mix(col, [86, 88, 98], 0.5);
+      col = mix(col, [24, 22, 26], Math.max(0, gnoise(wx, wy * 0.3, 5, 621) - 0.55) * 1.4);            // soot and wet streaks run down
+      if (col === MORT && gnoise(wx, wy, 4, 622) > 0.62) col = [150, 156, 170];                            // frost in the joints
+      if (role === "hi" && py < 9) {                                                                       // merlons and the gaps between
+        const merl = (Math.floor(wx / 12) % 2) === 0;
+        if (!merl) col = py < 7 ? [52, 50, 56] : SL[3];
+        else if (py < 3) col = mix(SNOW, [190, 194, 204], gnoise(wx, 0, 3, 623));
+        else if (py === 3) col = SL[2];
+      }
+      if (role === "lo" && py > GT - 7) { col = mix(col, [26, 24, 28], 0.45); const dr = gnoise(wx, 0, 9, 624); if (py > GT - 3 - dr * 6) col = mix(SNOW, [196, 200, 212], gnoise(wx, wy, 3, 625)); }
+      put(wx, wy, col);
+    }
+    // an arrow slit in every fourth face tile
+    if (role === "hi" && c === "F" && (tx * 7 + 3) % 4 === 0 && isF(at(tx - 1, ty)) && isF(at(tx + 1, ty))) {
+      for (let py = 14; py < GT + 6; py++) for (let px = 14; px < 18; px++) put(X0 + px, Y0 + py, px === 14 ? [20, 18, 22] : [10, 9, 12]);
+      for (let px = 12; px < 20; px++) put(X0 + px, Y0 + 22, [10, 9, 12]);
+    }
+    if (c === "H") {   // a gate in the face: an arch, black inside, with the portcullis down
+      const [a, z] = gateSpan(tx, ty), gx0 = a * GT + 5, gx1 = (z + 1) * GT - 6, mid = (gx0 + gx1) / 2, rad = (gx1 - gx0) / 2;
+      for (let py = 0; py < GT; py++) for (let px = 0; px < GT; px++) {
+        const wx = X0 + px, wy = Y0 + py, fy = wy - faceTop; if (wx < gx0 - 4 || wx > gx1 + 4) continue;
+        const archTop = 14 + rad - Math.sqrt(Math.max(0, rad * rad - (wx - mid) * (wx - mid))) * 0.55;
+        if (fy < archTop - 4) continue;
+        if (wx < gx0 || wx > gx1 || fy < archTop) { put(wx, wy, (Math.floor(wx / 6) + Math.floor(fy / 5)) % 2 ? [92, 94, 104] : [74, 76, 86]); continue; }   // voussoirs
+        let col = [12, 11, 14];
+        const raised = fy < archTop + 12;                                                                   // the portcullis, wound up into the arch
+        if (raised && ((wx - gx0) % 7 < 2 || (fy % 9) < 2)) col = (wx - gx0) % 7 === 0 || fy % 9 === 0 ? [96, 96, 104] : [58, 58, 66];
+        if (raised && fy >= archTop + 10) col = [40, 40, 46];
+        if (!raised && fy > archTop + 18) col = mix([12, 11, 14], [70, 68, 74], Math.min(1, (fy - archTop - 18) / 30));   // the street beyond, faintly
+        if (fy > GT * 2 - 3) col = mix(SNOW, [190, 194, 204], gnoise(wx, wy, 3, 626));
+        put(wx, wy, col);
+      }
+    }
+  }
 }
 
 /* ---------- helpers that ground objects in the base layer ---------- */
@@ -1565,4 +1942,51 @@ function footTrack(b, pts, w, seed) {
     for (let i = 0; i <= n; i++) { const t = i / n, x = x0 + (x1 - x0) * t, y = y0 + (y1 - y0) * t, r = w * 0.55; b.ell(x - r, y - r * 0.45, x + r, y + r * 0.45, GP.m1); }
     for (let i = 0; i < n; i += 5) { const t = i / n, x = x0 + (x1 - x0) * t + (gh(i, seed, 3) % 6) - 3, y = y0 + (y1 - y0) * t; b.ell(x, y, x + 2, y + 4, GP.wet); }
   }
+}
+
+/* ---------- snow on the northern plains ---------- */
+/* The ground: frost in pale rime patches, then drifts with ground showing between, then a full cover with only
+   the trampled road and dark stones breaking it. Water freezes to grey ice in the snow. */
+function snowGround(b, def, w, h) {
+  const d = b.d, W = b.w, RF = bakeGrimMap.RF, WF = bakeGrimMap.WF;
+  for (let ty = 0; ty < h; ty++) {
+    const a0 = snowAtTile(def, ty); if (a0 <= 0.01) continue;
+    for (let py = 0; py < GT; py++) {
+      const wy = ty * GT + py, a = snowAtTile(def, ty + py / GT);
+      for (let wx = 0; wx < W; wx++) {
+        const i = (wy * W + wx) * 4; if (!d[i + 3]) continue;
+        const n = gnoise(wx, wy + def.snowY0 * GT, 26, 77) * 0.7 + gnoise(wx, wy + def.snowY0 * GT, 7, 78) * 0.3;
+        const lum = (d[i] * 0.3 + d[i + 1] * 0.59 + d[i + 2] * 0.11) / 255;
+        const road = RF ? RF(wx, wy) : 0, water = WF ? WF(wx, wy) : 0;
+        let k;
+        if (water > 0.55 && a > 0.4) { const ice = [116 + n * 30, 128 + n * 30, 142 + n * 28]; d[i] += (ice[0] - d[i]) * 0.85; d[i + 1] += (ice[1] - d[i + 1]) * 0.85; d[i + 2] += (ice[2] - d[i + 2]) * 0.85; if (gnoise(wx, wy, 5, 79) > 0.86) { d[i] = 186; d[i + 1] = 196; d[i + 2] = 206; } continue; }
+        {   // one rule for every band, so the bands meet without a seam: patches where the noise runs high, more of them and whiter as the snow deepens
+          const t = 0.95 - a, cover = Math.max(0, Math.min(1, (n - t) / 0.05)), full = 0.3 + Math.max(0, Math.min(1, (a - 0.15) / 0.5)) * 0.62;
+          k = cover * full + (1 - cover) * a * 0.28;
+        }
+        if (road > 0.35) k *= a > 0.5 ? 0.55 : 0.4;                                                 // the road is trodden through
+        const shade = 168 + lum * 70 + (n - 0.5) * 18, sn = [shade - 6, shade - 2, shade + 8];
+        d[i] += (sn[0] - d[i]) * k; d[i + 1] += (sn[1] - d[i + 1]) * k; d[i + 2] += (sn[2] - d[i + 2]) * k;
+      }
+    }
+  }
+}
+/* A sprite with snow lying on every surface that faces up: the top pixel of each run turns white, and a second
+   below it in deep snow. Cached per sprite and depth. */
+const SNOWCAP = new WeakMap();
+function snowCapped(img, sn) {
+  const lv = sn > 0.7 ? 3 : sn > 0.4 ? 2 : 1;
+  let m = SNOWCAP.get(img); if (!m) { m = {}; SNOWCAP.set(img, m); }
+  if (m[lv]) return m[lv];
+  const c = makeCanvas(img.width, img.height), x = c.getContext("2d"); x.drawImage(img, 0, 0);
+  const id = x.getImageData(0, 0, c.width, c.height), d = id.data, Wd = c.width;
+  const op = (px, py) => py >= 0 && d[(py * Wd + px) * 4 + 3] > 40;
+  const deep = lv === 3 ? 3 : lv === 2 ? 2 : 1;
+  for (let py = 0; py < c.height; py++) for (let px = 0; px < Wd; px++) {
+    if (!op(px, py) || op(px, py - 1)) continue;
+    if (lv === 1 && (px * 7 + py * 3) % 3) continue;                                              // frost: a scatter of rime, not a cap
+    for (let k = 0; k < deep; k++) { if (!op(px, py + k)) break; const i = ((py + k) * Wd + px) * 4, v = k ? 200 : 228; d[i] = v - 8; d[i + 1] = v - 4; d[i + 2] = v + 6; }
+  }
+  x.putImageData(id, 0, 0);
+  return (m[lv] = c);
 }

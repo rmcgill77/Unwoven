@@ -232,6 +232,29 @@ function formatClock(min) {
   const h12 = ((h + 11) % 12) + 1;
   return `${h12}:${String(mm).padStart(2, "0")} ${h < 12 ? "am" : "pm"}`;
 }
+/* Every Pillar on a map: Oakhaven's is set by hand in pixels; the field Pillars by the tile their two stones stand on.
+   x: centre; y: the point the calm is measured from (plus 8); base: the ground line the stone stands on. */
+function pillarList(def) {
+  if (!def) return [];
+  if (def._pl) return def._pl;
+  const out = def.pillar ? [{ id: def.pillar.id || "oak", x: def.pillar.x, y: def.pillar.y, r: def.pillar.r, base: (Math.floor(def.pillar.y / TILE) + 1) * TILE }] : [];
+  for (const p of def.pillars || []) out.push({ id: p.id, x: (p.tx + 1) * TILE, y: p.ty * TILE + 8, r: p.r, base: (p.ty + 1) * TILE });
+  Object.defineProperty(def, "_pl", { value: out, enumerable: false, configurable: true });
+  return out;
+}
+function nearestPillar(def, x, y) {
+  let best = null, bd = 1e9;
+  for (const p of pillarList(def)) { const d = Math.hypot(x - p.x, y - p.y); if (d < bd) { bd = d; best = p; } }
+  return best;
+}
+/* Snow across the plains, by latitude (global tile row): green, frosted, patchy snow, full snow, with soft edges */
+function snowBand(gy) {
+  const lvl = (y) => (y < 24 ? 0.85 : y < 46 ? 0.55 : y < 66 ? 0.2 : 0);
+  for (const e of [24, 46, 66]) if (Math.abs(gy - e) < 2) { const t = (gy - (e - 2)) / 4; return lvl(e - 3) + (lvl(e + 1) - lvl(e - 3)) * t; }
+  return lvl(gy);
+}
+const snowAtTile = (def, ty) => (def && def.snowLevel !== undefined ? def.snowLevel : def && def.snowY0 !== undefined ? snowBand(ty + def.snowY0) : 0);
+
 /* Day and night replace the clock: time is one of two fixed moments. */
 const DAY_T = 9 * 60, NIGHT_T = 21 * 60 + 30;
 const isNightT = (min) => { const h = (min / 60) % 24; return h >= 19 || h < 5; };

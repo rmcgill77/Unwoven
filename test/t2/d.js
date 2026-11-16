@@ -1,0 +1,31 @@
+const { boot, jump } = require('./common');
+(async () => {
+  const { b, pg, errs } = await boot({ viewport: { width: 800, height: 450 }, dsf: 2 });
+  const warp = async (m, x, y, d) => { await pg.evaluate(([m, x, y, d]) => window.__durinn.eng.warp(m, x, y, d, { dur: 0.2 }), [m, x, y, d]); await pg.waitForTimeout(1000); };
+  const A = async (w = 350) => { await pg.keyboard.press('e'); await pg.waitForTimeout(w); };
+  const shot = (n) => pg.screenshot({ path: `shots2/${n}.png` });
+  await jump(pg, 'a2_start'); await pg.click('#dz-pillar-tut-ok'); await pg.waitForTimeout(300);
+  await warp('oak', 43, 19, 'right'); await shot('d1_gate_ash');
+  await pg.keyboard.down('ArrowRight'); await pg.waitForTimeout(1800); await pg.keyboard.up('ArrowRight'); await pg.waitForTimeout(1200); await shot('d2_edge');
+  for (let i = 0; i < 4; i++) await A(500);
+  console.log('tile after edge', JSON.stringify(await pg.evaluate(() => window.__durinn.eng.playerTile())));
+  await jump(pg, 'a2_rebuilt'); await shot('d3_rb_gate');
+  await warp('oak', 24, 21, 'up'); await shot('d4_rb_square');
+  await warp('oak', 14, 13, 'up'); await shot('d5_rb_memorial');
+  await warp('oak', 16, 12, 'left'); await A(600); await shot('d5b_memorial_text'); for (let i = 0; i < 3; i++) await A();
+  await warp('oak', 14, 28, 'up'); await shot('d6_rb_hall');
+  await warp('oak', 33, 28, 'up'); await shot('d7_rb_tavern');
+  await warp('oak', 24, 40, 'down'); await shot('d8_rb_south');
+  await warp('oak', 36, 43, 'down'); await shot('d9_rb_se');
+  await warp('tavern', 4, 4, 'up'); await shot('d10_bram');
+  await pg.evaluate(() => window.__durinn.shop('bram')); await pg.waitForTimeout(300); await shot('d11_bramshop');
+  await pg.click('#dz-shop-close');
+  // fast travel UI with a pretend second pillar
+  await pg.evaluate(() => { const a = window.__durinn.act2; a.PILLARS.test = { map: 'wood', name: 'North Woods (test)', at: [11, 56, 'up'] }; window.__durinn.G().pillars.test = true; });
+  await warp('oak', 24, 21, 'up'); await pg.evaluate(() => window.__durinn.pillar()); await pg.waitForTimeout(300); await shot('d12_pillar_travel');
+  await pg.click('#dz-pillar-travel'); await pg.waitForTimeout(300); await shot('d13_travel_list');
+  await pg.click('#dz-travel-test'); await pg.waitForTimeout(2600); await shot('d14_arrived');
+  console.log('map', await pg.evaluate(() => window.__durinn.eng.mapId()));
+  console.log(errs.filter((e) => !/ERR_TUNNEL/.test(e)));
+  await b.close();
+})();
