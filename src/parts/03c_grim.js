@@ -210,6 +210,21 @@ function bladesInto(b, tx, ty) {   // short grass blades, some pale and dead, sc
 const GS = {};   // cache of generated sprites
 function gsprite(key, make) { let c = GS[key]; if (!c) { c = make(); GS[key] = c; } return c; }
 
+/* Trees from the craftpix top-down pack (02r_tree_data.js), decoded once and drawn at 2x so their pixels match the
+   ground tiles. pickTree chooses one by kind and a hash, so the same spot always grows the same tree. */
+function sprPackTree(name) {
+  const t = TREE_ART[name], c = makeCanvas(t.w * 2, t.h * 2), x = c.getContext("2d"), id = x.createImageData(t.w * 2, t.h * 2), d = id.data;
+  const rgb = TREE_PAL.map((h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]);
+  for (let y = 0; y < t.h; y++) { const row = t.rows[y]; for (let i = 0; i < row.length; i++) { const ch = row[i]; if (ch === " ") continue; const k = rgb[TREE_CH.indexOf(ch)];
+    for (let j = 0; j < 4; j++) { const o = (((y * 2 + (j >> 1)) * t.w * 2) + i * 2 + (j & 1)) * 4; d[o] = k[0]; d[o + 1] = k[1]; d[o + 2] = k[2]; d[o + 3] = 255; } } }
+  x.putImageData(id, 0, 0); return c;
+}
+function pickTree(kind, r) { const list = TREE_KINDS[kind]; const name = list[r % list.length]; return { name, img: gsprite("ptree_" + name, () => sprPackTree(name)) }; }
+/* where a trunk meets the ground: a soft dark pool, darkest at the roots, so a tree stands in the earth */
+function rootPool(b, cx, cy, rx, ry, a) {
+  for (let y = -ry; y <= ry; y++) for (let x = -rx; x <= rx; x++) { const d = (x * x) / (rx * rx) + (y * y) / (ry * ry); if (d <= 1) b.blend(cx + x, cy + y, [10, 8, 12], a * (1 - d) * (1 - d * 0.3)); }
+}
+
 function sprTreeLeafy(v) {
   const s = new PB(70, 104);
   s.rect(32, 56, 39, 100, "#3a3026"); s.rect(32, 56, 34, 100, "#4e4234");
@@ -1371,7 +1386,7 @@ function bakeGrimMap(id, def, cells, w, h, props, trade) {
   bakeGrimMap.rat = 0; bakeGrimMap.clear = []; bakeGrimMap.flames = [];
   const snowy = def.snowY0 !== undefined;
   const hi = (img, x, y, sortY, extra) => {   // x,y in world units; on the snowy plains, things wear a cap of snow
-    if (snowy && img) { const sn = snowAtTile(def, Math.floor((sortY || y) / TILE)); if (sn > 0.12) img = snowCapped(img, sn); }
+    if (snowy && img && !(extra && extra.nocap)) { const sn = snowAtTile(def, Math.floor((sortY || y) / TILE)); if (sn > 0.12) img = snowCapped(img, sn); }
     talls.push({ hi: true, img, x, y, sortY, ...(extra || {}) });
   };
 
@@ -1397,7 +1412,8 @@ function bakeGrimMap(id, def, cells, w, h, props, trade) {
         }
         if (!col && (nR || nR2) && c !== "~") {
           const rf = RF(wx, wy) + (gnoise(wx, wy, 7, 172) - 0.5) * 0.16;
-          if (def.pave && rf > 0.38) col = paveColor(def.pave, wx, wy, rf);
+          const pz = def.paveZones ? def.paveZones.find((z) => tx >= z[0] && tx <= z[2] && ty >= z[1] && ty <= z[3]) : null;   // a town's streets seen from the plains
+          if ((def.pave || pz) && rf > 0.38) col = paveColor(pz ? pz[4] : def.pave, wx, wy, rf);
           if (col) {}
           else if (rf > 0.36) col = mudColor(wx, wy);
           else if (rf > 0.31) col = gnoise(wx, wy, 3, 174) > 0.5 ? GP.m0 : GP.gmud;   // a ragged lip of trodden earth
@@ -1525,7 +1541,7 @@ function bakeGrimMap(id, def, cells, w, h, props, trade) {
       const to = door ? warpTo[`${door[0]},${door[1]}`] : null;
       const style0 = to === "hall" || (to === "shop" && trade === "smith") ? "stone" : to === "store" ? "timber" : to === "tavern" ? "timber" : to === "shop" ? "timber" : "hovel";
       const kind0 = to === "shop" ? (trade === "smith" ? "smithy" : "workshop") : to === "store" ? "store" : to === "hall" ? "hall" : to === "tavern" ? "tavern" : "";
-      const dk = door && (def.doorKinds || {})[`${door[0]},${door[1]}`];
+      const dk = (door && (def.doorKinds || {})[`${door[0]},${door[1]}`]) || (def.bldKinds || {})[`${bd.x0},${bd.y0}`];
       const style = dk ? (dk === "chapel" || dk === "watch" || dk === "outpost" || dk === "boarded" ? "stone" : dk === "shack" ? "hovel" : "timber") : style0;
       const kind = dk || kind0;
       const BW = tw * GT, BH = th * GT;
@@ -1583,17 +1599,22 @@ function bakeGrimMap(id, def, cells, w, h, props, trade) {
         hi(img, ox / WZ, oy / WZ, ty * TILE + 1);
       } else if (c === "T") {
         const sn = snowAtTile(def, ty);
-        const kind = def.terrain === "rock" ? "dead" : sn > 0.5 ? (r % 10 < 7 ? "pine" : "dead") : sn > 0.1 ? (r % 10 < 4 ? "pine" : r % 10 < 6 ? "leafy" : "dead") : r % 10 < 5 ? "pine" : r % 10 < 8 ? "leafy" : "dead", v = r % 4;
-        const img = gsprite(`tree_${kind}${v}`, () => (kind === "pine" ? sprTreePine(v) : kind === "leafy" ? sprTreeLeafy(v) : sprTreeDead(v)));
-        const ox = (gh(tx, ty, 2) % 13) - 6, ox2 = tx * GT + 16 - img.width / 2 + ox, oy = ty * GT + 28 - img.height - (gh(tx, ty, 4) % 9);
-        castShadow(b, img, ox2, oy, 14, 5, 0.3);
-        hi(img, ox2 / WZ, oy / WZ, ty * TILE + 14 + (ox & 1));
+        const base = def.terrain === "rock" ? "dead" : sn > 0.5 ? (r % 10 < 7 ? "pine" : "dead") : sn > 0.1 ? (r % 10 < 4 ? "pine" : r % 10 < 6 ? "leafy" : "dead") : r % 10 < 5 ? "pine" : r % 10 < 8 ? "leafy" : "dead";
+        const kind = sn > 0.3 && base !== "leafy" ? "snow" + base : base;
+        const { img } = pickTree(kind, gh(tx, ty, 11));
+        // the trunk's foot sits on the tile's lower part; trees shift sideways and a little up or down, never off the ground
+        const jx = (gh(tx, ty, 2) % 11) - 5, jy = (gh(tx, ty, 4) % 5) - 2, footX = tx * GT + 16 + jx, footY = ty * GT + 27 + jy;
+        const ox2 = footX - img.width / 2, oy = footY - img.height;
+        castShadow(b, img, ox2, oy, 9, 4, 0.18);
+        rootPool(b, footX + 1, footY - 1, Math.max(9, Math.round(img.width * 0.26)), 5, 0.55);
+        hi(img, ox2 / WZ, oy / WZ, ty * TILE + 14 + (jx & 1), kind.startsWith("snow") ? { nocap: true } : null);
         const open = at(tx, ty + 1) !== "T" && at(tx, ty + 1) !== null;
         if (open && gh(tx, ty, 6) % 3 !== 0) {   // undergrowth where the trees give way, so the edge of a wood is ragged rather than ruled
           const bimg = gsprite("bush" + (r % 2), () => sprBush(r % 2)), bx = tx * GT + (gh(tx, ty, 7) % 14) - 4, by = ty * GT + 32 - bimg.height + 2;
           castShadow(b, bimg, bx, by, 4, 3, 0.3); hi(bimg, bx / WZ, by / WZ, ty * TILE + 15.5);
         }
-        if (open) for (let k = 0; k < 2; k++) hi(gsprite("weed" + ((r + k) % 3), () => sprWeed((r + k) % 3)), tx * TILE + (gh(tx, ty, 8 + k) % 14), ty * TILE + 16 + (k ? 1 : -1), ty * TILE + 23);
+        // grass and weeds about the roots, in front of and beside the trunk, so the tree grows out of the ground
+        for (let k = 0; k < 3; k++) if (k < 2 || open) { const wv = (r + k) % 3, wx = footX / WZ - 9 + (gh(tx, ty, 8 + k) % 16), wy = footY / WZ - 2 + (k === 2 ? 3 : 0); hi(gsprite("weed" + wv, () => sprWeed(wv)), wx, wy - 3, footY / WZ + 0.3 + k * 0.01); }
       } else if (c === "b") {
         const img = gsprite("bush" + (r % 2), () => sprBush(r % 2)), ox = tx * GT + 16 - 18, oy = ty * GT + 30 - img.height;
         castShadow(b, img, ox, oy, 5, 3, 0.35); hi(img, ox / WZ, oy / WZ, ty * TILE + 15);
@@ -1812,7 +1833,7 @@ function bakeGrimMap(id, def, cells, w, h, props, trade) {
     talls.push(entry);
   }
   if (def.outside && def.snowY0 !== undefined) snowGround(b, def, w, h);
-  if (def.fort) fortWalls(b, def, cells, w, h);
+  if (def.fort || def.plains) fortWalls(b, def, cells, w, h);
   return { base: (() => { const c = b.canvas(); return c; })(), talls, lights: lightsOut, clear: bakeGrimMap.clear, flames: bakeGrimMap.flames };
 }
 
@@ -1821,10 +1842,18 @@ function bakeGrimMap(id, def, cells, w, h, props, trade) {
    it is one of the two lowest rows of its column of wall, which together make the face: slate-dark coursed stone
    under a crenellated top, arrow slits, frost in the joints and a drift of snow at the foot. Gates are dark arches with
    a portcullis down (shut) on a south face, and iron-strapped timber doors where they sit in the wall-walk. */
+/* Fort Frostcrown's walls, and the town walls seen from the open plains (Ashford, Greywick). Away from the snow the
+   white becomes moss and weathered stone, and the frost in the joints becomes dirt. */
 function fortWalls(b, def, cells, w, h) {
   const at = (x, y) => (y >= 0 && y < h && x >= 0 && x < w ? cells[y][x] : null), isF = (c) => c === "F" || c === "H";
+  let any = false; for (let y = 0; y < h && !any; y++) if (cells[y].indexOf("F") >= 0 || cells[y].indexOf("H") >= 0) any = true;
+  if (!any) return;
   const mix = (a, c, t) => [a[0] + (c[0] - a[0]) * t, a[1] + (c[1] - a[1]) * t, a[2] + (c[2] - a[2]) * t];
-  const SL = [[46, 48, 58], [56, 58, 68], [66, 68, 78], [38, 38, 46]], MORT = [28, 28, 34], SNOW = [214, 218, 228], FLAG = [[88, 86, 92], [98, 96, 102], [78, 76, 84]];
+  let wy0 = h; for (let y = 0; y < h; y++) if (cells[y].indexOf("H") >= 0) { wy0 = y; break; }
+  const snowy = !!def.fort || (typeof snowAtTile === "function" && snowAtTile(def, wy0) > 0.35);
+  const SL = snowy ? [[46, 48, 58], [56, 58, 68], [66, 68, 78], [38, 38, 46]] : [[62, 60, 60], [74, 72, 70], [86, 84, 80], [46, 44, 46]], MORT = snowy ? [28, 28, 34] : [36, 34, 32];
+  const SNOW = snowy ? [214, 218, 228] : [70, 82, 52], FLAG = snowy ? [[88, 86, 92], [98, 96, 102], [78, 76, 84]] : [[92, 88, 84], [102, 98, 92], [80, 76, 72]];
+  const RIME = snowy ? [150, 154, 166] : [96, 94, 88], FROST = snowy ? [150, 156, 170] : [40, 46, 30], LIGHT = snowy ? [190, 194, 204] : [96, 106, 70], LIGHT2 = snowy ? [180, 184, 194] : [98, 96, 92], DRIFT = snowy ? [196, 200, 212] : [58, 66, 42];
   const put = (x, y, c) => b.set(x, y, c);
   // runs of gate tiles, so an arch spans the whole gate
   const gateSpan = (tx, ty) => { let a = tx, z = tx; while (at(a - 1, ty) === "H") a--; while (at(z + 1, ty) === "H") z++; return [a, z]; };
@@ -1839,7 +1868,7 @@ function fortWalls(b, def, cells, w, h) {
         if (wy % 12 === 0 || (wx + (row % 2) * 9) % 18 === 0) col = [60, 58, 66];
         col = mix(col, [50, 48, 54], gnoise(wx, wy, 6, 611) * 0.35);
         const sn = gnoise(wx, wy, 10, 612) * 0.7 + gnoise(wx, wy, 3, 613) * 0.3;
-        col = mix(col, [150, 154, 166], 0.18);                                                               // a rime over everything
+        col = mix(col, RIME, 0.18);                                                                         // a rime over everything (a weathering, off the snow)
         const edge = Math.min(py, GT - 1 - py) < 5 || Math.min(px, GT - 1 - px) < 5;                           // snow banks against the parapets and in the joints
         if (sn > (edge ? 0.5 : 0.66)) col = mix(col, SNOW, Math.min(0.85, (sn - (edge ? 0.5 : 0.66)) * 4));
         put(wx, wy, col);
@@ -1860,7 +1889,7 @@ function fortWalls(b, def, cells, w, h) {
           const merl = (Math.floor(((horiz ? x0 : y0) + i) / 8) % 2) === 0, tall = merl ? 6 : 3;
           if (k >= tall) continue;
           const x = horiz ? x0 + i : x0 + (out < 0 ? k : GT - 1 - k), y = horiz ? y0 + (out < 0 ? k : GT - 1 - k) : y0 + i;
-          put(x, y, k === tall - 1 || (horiz ? false : false) ? (merl ? SNOW : [180, 184, 194]) : k === 0 ? SL[3] : SL[1]);
+          put(x, y, k === tall - 1 || (horiz ? false : false) ? (merl ? SNOW : LIGHT2) : k === 0 ? SL[3] : SL[1]);
         }
       };
       if (!isF(at(tx, ty - 1))) lip(true, X0, Y0, GT, -1);
@@ -1876,14 +1905,14 @@ function fortWalls(b, def, cells, w, h) {
       if (fy % 8 === 7 || (wx + (course % 2) * 8) % 16 === 15) col = MORT;
       else if (fy % 8 === 0) col = mix(col, [86, 88, 98], 0.5);
       col = mix(col, [24, 22, 26], Math.max(0, gnoise(wx, wy * 0.3, 5, 621) - 0.55) * 1.4);            // soot and wet streaks run down
-      if (col === MORT && gnoise(wx, wy, 4, 622) > 0.62) col = [150, 156, 170];                            // frost in the joints
+      if (col === MORT && gnoise(wx, wy, 4, 622) > 0.62) col = FROST;                                      // frost (or moss) in the joints
       if (role === "hi" && py < 9) {                                                                       // merlons and the gaps between
         const merl = (Math.floor(wx / 12) % 2) === 0;
         if (!merl) col = py < 7 ? [52, 50, 56] : SL[3];
-        else if (py < 3) col = mix(SNOW, [190, 194, 204], gnoise(wx, 0, 3, 623));
+        else if (py < 3) col = mix(SNOW, LIGHT, gnoise(wx, 0, 3, 623));
         else if (py === 3) col = SL[2];
       }
-      if (role === "lo" && py > GT - 7) { col = mix(col, [26, 24, 28], 0.45); const dr = gnoise(wx, 0, 9, 624); if (py > GT - 3 - dr * 6) col = mix(SNOW, [196, 200, 212], gnoise(wx, wy, 3, 625)); }
+      if (role === "lo" && py > GT - 7) { col = mix(col, [26, 24, 28], 0.45); const dr = gnoise(wx, 0, 9, 624); if (py > GT - 3 - dr * 6) col = mix(SNOW, DRIFT, gnoise(wx, wy, 3, 625)); }
       put(wx, wy, col);
     }
     // an arrow slit in every fourth face tile
@@ -1903,7 +1932,7 @@ function fortWalls(b, def, cells, w, h) {
         if (raised && ((wx - gx0) % 7 < 2 || (fy % 9) < 2)) col = (wx - gx0) % 7 === 0 || fy % 9 === 0 ? [96, 96, 104] : [58, 58, 66];
         if (raised && fy >= archTop + 10) col = [40, 40, 46];
         if (!raised && fy > archTop + 18) col = mix([12, 11, 14], [70, 68, 74], Math.min(1, (fy - archTop - 18) / 30));   // the street beyond, faintly
-        if (fy > GT * 2 - 3) col = mix(SNOW, [190, 194, 204], gnoise(wx, wy, 3, 626));
+        if (fy > GT * 2 - 3) col = mix(SNOW, LIGHT, gnoise(wx, wy, 3, 626));
         put(wx, wy, col);
       }
     }

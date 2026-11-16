@@ -2,7 +2,7 @@
 
 A mobile-first, landscape pixel RPG in the spirit of classic Zelda, with Final Fantasy-style ATB battles and a magic system built from Old Tongue words (Root + Suffix, e.g. `Pyr-or`, a thrown flame). You play Corin or Elowyn Quill-mark, the orphaned Clerk's apprentice of Oakhaven, in the realm of Etharis on the continent of Talvora.
 
-**This repository holds Acts One and Two**, released as a test build (`0.2.0-act2`). They are one continuous game: Act One ends with the end-of-act card, and pressing Continue opens Act Two (Ashford, the Frostcrown Plains, Greywick, the Outskirts and the fort). Saves made at the end of Act One step into Act Two when loaded.
+**This repository holds Acts One and Two**, released as a test build (`0.2.1-act2`). They are one continuous game: Act One ends with the end-of-act card, and pressing Continue opens Act Two (Ashford, the Frostcrown Plains, Greywick, the Outskirts and the fort). Saves made at the end of Act One step into Act Two when loaded.
 
 The whole game is one React component, built from the files in `src/parts/` into a single HTML page plus a React bundle, the music and the sound effects. There is no server: progress saves to the browser's localStorage.
 
@@ -23,7 +23,7 @@ Open it on a phone on the same network, or deploy (below). It is played in lands
 To cut a numbered test build, tag it:
 
 ```bash
-git tag v0.2.0-act2 && git push origin v0.2.0-act2
+git tag v0.2.1-act2 && git push origin v0.2.1-act2
 ```
 
 The tag also creates a pre-release on GitHub with the playable build attached as a zip. Testers can unzip it and serve the folder from any static host (opening `index.html` straight from disk also works, but some browsers block the music there).
@@ -45,7 +45,7 @@ The Act Two scripts are Node Playwright scripts in `test/t2/`. Run them from a s
 
 ```bash
 mkdir -p /tmp/t2/shots2 && cd /tmp/t2
-for t in gw os fort act2end ashq ef spar book southroad; do node <repo>/test/t2/$t.js; done
+for t in gw os fort act2end ashq ef spar book southroad towngates; do node <repo>/test/t2/$t.js; done
 ```
 
 `abilities.js` calls `btlFreshMember` from inside the page, which is not exposed on `window`, so it fails at setup until it is updated.

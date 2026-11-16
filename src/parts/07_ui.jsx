@@ -2,6 +2,38 @@
 /* ------------------------------------------------------------------ */
 /* React shell                                                         */
 /* ------------------------------------------------------------------ */
+/* the top-left HUD, built from the Game User Interface pack: an open-right frame whose lines run beige into orange,
+   a brass junction where the task section joins, the speckled plum backing, a segmented meter and yellow icons */
+const HUD_CSS = `
+.dz-hud{width:min(236px,calc(100% - 90px));max-width:none}
+.hd-panel{position:relative;overflow:hidden;filter:drop-shadow(0 3px 0 rgba(10,6,10,.55))}
+.hd-panel::after{content:"";position:absolute;top:0;right:0;bottom:0;width:2px;background:#25131a;box-shadow:-2px 0 0 rgba(37,19,26,.45)}
+.hd-top,.hd-bot,.hd-div{background-repeat:no-repeat;background-position:left top;image-rendering:pixelated}
+.hd-top{height:6px;background-image:url(${HUD_ART.top})}
+.hd-bot{height:6px;background-image:url(${HUD_ART.bot})}
+.hd-div{height:12px;background-image:url(${HUD_ART.div}),url(${HUD_ART.back});background-position:left top,6px -40px;background-repeat:no-repeat,no-repeat;background-color:#3d253b}
+.hd-sec{background-image:url(${HUD_ART.rail}),url(${HUD_ART.back});background-repeat:repeat-y,repeat-y;background-position:left top,6px top;background-color:#3d253b;image-rendering:pixelated;padding:3px 8px 4px 12px!important;border:0!important;box-shadow:none!important}
+.hd-sec.dz-hudbox{gap:2px}
+.hd-sec .dz-time{font-size:11px}.hd-sec.dz-task{font-size:11px;line-height:1.3;gap:1px}.hd-sec.dz-task small{font-size:10px}
+.hd-sec .dz-zone{color:#ffd569;text-shadow:0 2px 0 #25131a;letter-spacing:.08em;font-size:11px}
+.hd-sec .dz-time{color:#e9d9c4;align-items:center}
+.hd-sec .dz-time b{color:#e39a3a}
+.hd-row{display:inline-flex;align-items:center;gap:4px}
+.hd-ico{flex:none;width:18px;height:18px;background:url(${HUD_ART.icons}) no-repeat;image-rendering:pixelated;filter:drop-shadow(0 1px 0 #25131a)}
+.hd-sun{background-position:${-18 * HUD_ICON.day}px 0}
+[data-night="1"]>.hd-sun{background-position:${-18 * HUD_ICON.night}px 0}
+.hd-coin{background-position:${-18 * HUD_ICON.coin}px 0}
+.hd-ley{background-position:${-18 * HUD_ICON.ley}px 0}
+.hd-task{background-position:${-18 * HUD_ICON.task}px 0}
+.hd-sec .dz-ley{color:#9a8571;font-size:10px}
+.hd-bar{height:10px!important;background:url(${HUD_ART.off}) repeat-x 0 -3px!important;box-shadow:none!important;image-rendering:pixelated;margin-top:1px}
+.hd-bar>i{background:url(${HUD_ART.on}) repeat-x 0 -3px!important;filter:hue-rotate(130deg) saturate(.75) brightness(.95)}
+.hd-bar>i[data-wild="1"]{filter:hue-rotate(-18deg) saturate(1.1)}
+.hd-sec.dz-task{color:#e9d9c4}
+.hd-sec.dz-task small{color:#9a8571}
+.hd-tasklbl{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:#ffd569}
+@media (max-height:380px){.dz-hud{width:min(212px,calc(100% - 90px))}.hd-sec{padding:2px 7px 3px 11px!important}.hd-sec.dz-task small{display:none}}
+`;
 const CSS = `
 .dz-root{--ink:${PAL.ink};--night:${PAL.night};--panel:#241e36;--panel2:#2c2542;--edge:#3f3658;--text:${PAL.white};--muted:#b4a8c8;--ley:${PAL.ley};--ember:${PAL.ember};--parch:${PAL.parch};--good:${PAL.leafL};--bad:${PAL.flowerR};
   position:absolute;inset:0;overflow:hidden;background:var(--ink);color:var(--text);touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;
@@ -23,7 +55,7 @@ const CSS = `
 .dz-bar>i[data-wild="1"]{background:var(--ember)}
 .dz-task{padding:6px 10px;font-size:12px;line-height:1.35;display:grid;gap:2px}
 .dz-task small{color:var(--muted);font-size:11px}
-.dz-task::before{content:"Task";font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ley)}
+.dz-task::before{content:none}
 .dz-fps{position:absolute;bottom:calc(6px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);font-size:11px;color:var(--muted);pointer-events:none;font-variant-numeric:tabular-nums}
 .dz-hint{position:absolute;bottom:calc(10px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);font-size:12px;color:var(--muted);padding:5px 10px;white-space:nowrap;pointer-events:none}
 .dz-ctl{position:absolute;inset:0}
@@ -697,12 +729,17 @@ const CREDIT_ROWS = [
   ["Characters, creatures and NPCs", "craftpix.net: chibi male and female sprites, RPG heroes, warrior, knight and robot sprite sheets, peasants, village NPCs, witches, warrior girls, NPC elves, anime warriors, fantasy enemies, orcs, skeletons, slimes, golem, predator plant mobs, hunt animals, Fire Wizard, Lightning Mage and Wanderer Magician"],
   ["", "Monsters Creatures Fantasy 2 · Pixel Monster Pack · Pixel Chest Pack · Soul Hunter by Honza Shift"],
   ["Battle backgrounds", "craftpix.net: fantasy 2D battlegrounds, free winter backgrounds, fantasy horizontal battle backgrounds"],
-  ["Tiles, effects and icons", "craftpix.net: top-down ruins, trees, rocks, guild hall, paths and roads, dungeon tiles, magic sprite effects, weapon icons"],
+  ["Tiles, effects and icons", "craftpix.net: top-down ruins, top-down trees, rocks, guild hall, paths and roads, dungeon tiles, magic sprite effects, weapon and item icons, book and bestiary art, game user interface frames and icons"],
   ["Type", "Pixelify Sans by Stefie Justprince (SIL Open Font License)"],
   ["", "All third-party art was recoloured and grimmed for Talvora."],
 ];
+/* For the testers: thanks, and a part in the game for anyone who reaches the end of an act. */
+const TESTER_ROWS = (act) => [
+  ["To our testers", "Thank you, each and every one of you. Every bug you found, every note you sent and every hour you spent wandering Talvora made this a better game."],
+  ["A part in Talvora", `You made it to the end of Act ${act === 2 ? "Two" : "One"}, and that earns you a role in the game. Be a villager, a guard, a merchant, a foe, anyone you like, under your own name or one you choose. Take a screenshot of this card and send it to Ryan with how you'd like to appear.`],
+];
 function ActCredits({ onDone, act = 1 }) {
-  const rows = [["Unwoven: A Tale of Talvora", act === 2 ? "Act Two · The Frostcrown March" : "Act One · Oakhaven"], ...CREDIT_ROWS,
+  const rows = [["Unwoven: A Tale of Talvora", act === 2 ? "Act Two · The Frostcrown March" : "Act One · Oakhaven"], ...CREDIT_ROWS, ...TESTER_ROWS(act),
     ...(act === 2 ? [["", "Act Three: southern Etharis."], ["", "The plains are still yours to explore until then."]] : [["", "Act Two: the east road to Ashford."]])];
   return (
     <div className="dz-tut" role="dialog" aria-label="Act credits" style={{ zIndex: 60, background: "rgba(10,8,14,.94)", overflowY: "auto" }}>
@@ -710,7 +747,7 @@ function ActCredits({ onDone, act = 1 }) {
       <div style={{ textAlign: "center", maxWidth: 560, padding: 16, display: "grid", gap: 14 }}>
         <div className="dz-cr" style={{ font: "700 clamp(18px,5vh,30px) monospace", letterSpacing: ".3em", color: "#e9d9b4" }}>{act === 2 ? "END OF ACT TWO" : "END OF ACT ONE"}</div>
         {rows.map(([a, b], i) => (
-          <div key={i} className="dz-cr" style={{ animationDelay: `${0.8 + i * 0.6}s` }}>
+          <div key={i} className="dz-cr" id={a === "A part in Talvora" ? "dz-credits-role" : a === "To our testers" ? "dz-credits-thanks" : undefined} style={{ animationDelay: `${0.8 + i * 0.6}s`, ...(a === "To our testers" || a === "A part in Talvora" ? { border: "1px solid rgba(233,217,180,.25)", background: "rgba(233,217,180,.05)", padding: "10px 12px" } : null) }}>
             {a ? <div style={{ fontSize: 12, letterSpacing: ".22em", textTransform: "uppercase", color: "#8fa3a0" }}>{a}</div> : null}
             <div style={{ fontSize: b.length > 80 ? 12 : 15, lineHeight: 1.45, color: "#e9d9b4" }}>{b}</div>
           </div>
@@ -749,6 +786,11 @@ export default function DurinnGame({ hot }) {
   const [gearWho, setGearWho] = useState("wren");
   const [study, setStudy] = useState(null);           // { root, key } while the tome is open at a Pillar
   const [toolsOpen, setToolsOpen] = useState(false);
+  const [devOk, setDevOk] = useState(() => storeGet(DEV_KEY) === DEV_HASH);
+  const [devPw, setDevPw] = useState(""); const [devErr, setDevErr] = useState(false);
+  const devTry = () => { if (devHash(devPw) === DEV_HASH) { setDevOk(true); storeSet(DEV_KEY, DEV_HASH); setDevErr(false); } else setDevErr(true); setDevPw(""); };
+  const devLock = () => { setDevOk(false); setToolsOpen(false); try { localStorage.removeItem(DEV_KEY); } catch (e) { /* ignore */ } setSettings((s) => ({ ...s, debug: false, fps: false })); };
+  useEffect(() => { if (!devOk && (settings.debug || settings.fps)) setSettings((s) => ({ ...s, debug: false, fps: false })); }, [devOk]); // eslint-disable-line
   const [giveId, setGiveId] = useState("poultice");
   const [spotIdx, setSpotIdx] = useState(0);
   const [dlg, setDlg] = useState(null);
@@ -822,7 +864,7 @@ export default function DurinnGame({ hot }) {
     });
     engRef.current = eng;
     eng.applySettings(settings);
-    try { window.__durinn = { eng, music: () => Music.current(), musicDbg: () => Music.debug(), data: () => ({ MAP_DEFS, LOOK_TEXT, SCRIPTS, NPC_DEFS, TRADES, PROP_DEFS: typeof PROP_DEFS !== "undefined" ? PROP_DEFS : null, SOLID_TILES: [...SOLID_TILES] }), art: { battleFor, swingPose, drawSwordOn, getPortrait, getSheet, npcLookFor, NPC_DEFS, makeCanvas, drawFigure, drawWolf, chibiFor, CHIBI }, G: () => GRef.current, openJob: (k) => setJob({ kind: k, level: 1, key: Date.now() }), openDice: (o) => setDice({ opp: o, key: Date.now() }), run: (name, id) => runScript(SCRIPTS[name](scriptCtx(), id), "narrator"), toast: (m) => flashToast(m, 4000), study: (r) => setStudy({ root: r, key: Date.now() }), act2: { createBattle, craftOne, canCraft, learnRecipe, RECIPES, studyResult, runeFor, btlStatsFor, pillarRest, regrowRoll, sellQuote, sellOne, buyOne, buyPrice, econRecover, SHOPS, PILLARS, ITEMS, isSlain, markSlain, propGone, act2Ensure }, shop: (id) => setShopOpen(id || "pike"), pillar: () => setPillarUi({ id: pillarOf(eng.mapId()) || "oak", view: "main" }), fight: (foes) => { const G = GRef.current; btlEnsureParty(G); setFight({ foes, G, practice: false, wild: true, id: Date.now() }); } }; } catch (e) { /* ignore */ }
+    try { window.__durinn = { eng, away: () => audioAway(), music: () => Music.current(), musicDbg: () => Music.debug(), data: () => ({ MAP_DEFS, LOOK_TEXT, SCRIPTS, NPC_DEFS, TRADES, PROP_DEFS: typeof PROP_DEFS !== "undefined" ? PROP_DEFS : null, SOLID_TILES: [...SOLID_TILES] }), art: { battleFor, swingPose, drawSwordOn, getPortrait, getSheet, npcLookFor, NPC_DEFS, makeCanvas, drawFigure, drawWolf, chibiFor, CHIBI }, G: () => GRef.current, openJob: (k) => setJob({ kind: k, level: 1, key: Date.now() }), openDice: (o) => setDice({ opp: o, key: Date.now() }), run: (name, id) => runScript(SCRIPTS[name](scriptCtx(), id), "narrator"), toast: (m) => flashToast(m, 4000), study: (r) => setStudy({ root: r, key: Date.now() }), act2: { createBattle, craftOne, canCraft, learnRecipe, RECIPES, studyResult, runeFor, btlStatsFor, pillarRest, regrowRoll, sellQuote, sellOne, buyOne, buyPrice, econRecover, SHOPS, PILLARS, ITEMS, isSlain, markSlain, propGone, act2Ensure }, shop: (id) => setShopOpen(id || "pike"), pillar: () => setPillarUi({ id: pillarOf(eng.mapId()) || "oak", view: "main" }), fight: (foes) => { const G = GRef.current; btlEnsureParty(G); setFight({ foes, G, practice: false, wild: true, id: Date.now() }); } }; } catch (e) { /* ignore */ }
     if (hot && hot.save && hot.save.v === SAVE_VERSION) { GRef.current = hot.save; eng.start(hot.save); setScreen("game"); }
     return () => eng.destroy();
   }, []);
@@ -1424,20 +1466,27 @@ export default function DurinnGame({ hot }) {
   }, [screen, credits, fight, job, dice, G, eng]);
   return (
     <div className="dz-root" ref={rootRef}>
-      <style>{CSS}</style>
+      <style>{CSS}</style><style>{HUD_CSS}</style>
       <canvas className="dz-canvas" ref={canvasRef} aria-label="Oakhaven" />
 
       {screen === "game" ? (
         <div className="dz-hud">
-          <div className="dz-hudbox dz-frame">
-            <div className="dz-zone" ref={hudRefs.place}>Oakhaven</div>
-            <div className="dz-time"><span ref={hudRefs.time}>Day 1</span><b ref={hudRefs.coins}>0 coppers</b></div>
-            {magicOn ? <div className="dz-ley"><span className="dz-ley-ico" aria-hidden="true" /><span ref={hudRefs.ley}>Calm</span></div> : null}
-            {magicOn ? <div className="dz-bar"><i ref={hudRefs.bar} /></div> : null}
+          <div className="hd-panel">
+            <div className="hd-top" />
+            <div className="hd-sec dz-hudbox">
+              <div className="dz-zone" ref={hudRefs.place}>Oakhaven</div>
+              <div className="dz-time"><span className="hd-row"><i className="hd-ico hd-sun" aria-hidden="true" /><span ref={hudRefs.time}>Day 1</span></span><b className="hd-row"><i className="hd-ico hd-coin" aria-hidden="true" /><span ref={hudRefs.coins}>0 coppers</span></b></div>
+              {magicOn ? <div className="dz-ley hd-row"><i className="hd-ico hd-ley" aria-hidden="true" /><span ref={hudRefs.ley}>Calm</span></div> : null}
+              {magicOn ? <div className="dz-bar hd-bar"><i ref={hudRefs.bar} /></div> : null}
+            </div>
+            {curTask && !dlg && !menu ? (
+              <>
+                <div className="hd-div" />
+                <div className="hd-sec dz-task"><span className="hd-row hd-tasklbl"><i className="hd-ico hd-task" aria-hidden="true" />Task</span>{curTask.text}{curTask.hint ? <small>{curTask.hint}</small> : null}</div>
+              </>
+            ) : null}
+            <div className="hd-bot" />
           </div>
-          {curTask && !dlg && !menu ? (
-            <div className="dz-task dz-frame">{curTask.text}{curTask.hint ? <small>{curTask.hint}</small> : null}</div>
-          ) : null}
         </div>
       ) : null}
 
@@ -1699,7 +1748,7 @@ export default function DurinnGame({ hot }) {
             <div className="dz-phead">
               <div className="dz-ptitle">{PACK_TABS.includes(menu) ? "Pack" : "Menu"} · {G.name} {PLAYER_SURNAME}</div>
               <div role="tablist" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                {(PACK_TABS.includes(menu) ? [["gear", "Gear"], ["pack", "Pack"], ["self", "Character"]] : [["settings", "Settings"], ...(magicOn ? [["guide", "How magic works"]] : []), ["art", "Art"]]).map(([id, label]) => (
+                {(PACK_TABS.includes(menu) ? [["gear", "Gear"], ["pack", "Pack"], ["self", "Character"]] : [["settings", "Settings"], ...(magicOn ? [["guide", "How magic works"]] : []), ...(devOk ? [["art", "Art"]] : [])]).map(([id, label]) => (
                   <button key={id} id={`dz-tab-${id}`} role="tab" className="dz-tab" aria-selected={menu === id} onClick={() => { setMenu(id); setConfirm(null); }}>{label}</button>
                 ))}
               </div>
@@ -1911,6 +1960,17 @@ export default function DurinnGame({ hot }) {
                       </div>
                     )}
                   </section>
+                  {!devOk ? (
+                  <section className="dz-sec">
+                    <h3>Developer tools</h3>
+                    <p>Locked. Enter the developer password to open the testing tools.</p>
+                    <form className="dz-opts" onSubmit={(e) => { e.preventDefault(); devTry(); }}>
+                      <input id="dz-dev-pass" className="dz-sel" type="password" autoComplete="off" placeholder="Password" value={devPw} onChange={(e) => { setDevPw(e.target.value); setDevErr(false); }} onKeyDown={(e) => e.stopPropagation()} />
+                      <button id="dz-dev-go" type="submit" className="dz-act">Unlock</button>
+                    </form>
+                    {devErr ? <p id="dz-dev-err" style={{ color: "var(--bad, #e07060)" }}>That isn't it.</p> : null}
+                  </section>
+                  ) : (<>
                   <section className="dz-sec">
                     <h3>Testing tools</h3>
                     <p>Jump to any finished part of the game, add things, or start a fight. Jumping rebuilds your story progress to that point and keeps your gear and loot.</p>
@@ -1966,11 +2026,13 @@ export default function DurinnGame({ hot }) {
                     <div className="dz-opts">
                       <button id="dz-debug" className="dz-opt" aria-pressed={settings.debug} onClick={() => setSettings((s) => ({ ...s, debug: !s.debug }))}>Show collision</button>
                       <button id="dz-fpsbtn" className="dz-opt" aria-pressed={settings.fps} onClick={() => setSettings((s) => ({ ...s, fps: !s.fps }))}>Show frame rate</button>
+                      <button id="dz-dev-lock" className="dz-opt" onClick={devLock}>Lock developer tools</button>
                     </div>
                   </section>
+                  </>)}
                 </>
               ) : null}
-              {menu === "art" && eng ? (
+              {menu === "art" && eng && devOk ? (
                 <>
                   <section className="dz-sec">
                     <h3>Portraits · 48 × 48</h3>

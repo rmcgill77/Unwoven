@@ -171,7 +171,7 @@ ok = reach((12, 3))
 bad = [(k, v) for k, v in doors.items() if (k[0], k[1] + 1) not in ok]
 assert not bad, bad
 
-warps = [{"x": 12, "y": 0, "to": "plainsSW", "tx": 58, "ty": 29, "dir": "up"}, {"x": 13, "y": 0, "to": "plainsSW", "tx": 59, "ty": 29, "dir": "up"}]
+warps = [{"x": 12, "y": 0, "to": "plainsSW", "tx": 58, "ty": 28, "dir": "up"}, {"x": 13, "y": 0, "to": "plainsSW", "tx": 59, "ty": 28, "dir": "up"}]
 d = {
     "name": "Ashford", "outside": True, "town": True, "pave": "ash", "act2": True,
     "rows": rows, "props": props, "signs": signs, "warps": warps,

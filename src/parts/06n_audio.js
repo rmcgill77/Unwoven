@@ -64,9 +64,13 @@ const Sfx = (() => {
     }
     if (!busy) { clearInterval(ambTimer); ambTimer = 0; }
   };
+  AWAY.subs.push((away) => {
+    if (away) { for (const p of Object.values(pools)) p.forEach((a) => { if (!a.paused) a.pause(); }); for (const a of Object.values(ambEls)) if (!a.paused) a.pause(); }
+    else if (ambWant && vol && ambEls[ambWant]) { const p = ambEls[ambWant].play(); if (p && p.catch) p.catch(() => {}); if (!ambTimer) ambTimer = setInterval(ambTick, 60); }
+  });
   return {
     play(k, v = 1) {
-      if (!vol || !k) return;
+      if (!vol || !k || AWAY.on) return;
       const a = get(k); if (!a) return;
       try { a.currentTime = 0; a.volume = Math.min(1, vol * v); const p = a.play(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* not yet allowed to play */ }
     },
@@ -74,7 +78,7 @@ const Sfx = (() => {
     amb(k) {
       if (k === ambWant) return; ambWant = k;
       if (k && !ambEls[k]) { try { const a = new Audio(`sfx/amb_${k}.mp3`); a.loop = true; a.volume = 0; ambEls[k] = a; } catch (e) { /* ignore */ } }
-      if (k && ambEls[k] && ambEls[k].paused && vol) { const p = ambEls[k].play(); if (p && p.catch) p.catch(() => {}); }
+      if (k && ambEls[k] && ambEls[k].paused && vol && !AWAY.on) { const p = ambEls[k].play(); if (p && p.catch) p.catch(() => {}); }
       if (!ambTimer) ambTimer = setInterval(ambTick, 60);
     },
     volume(v) { vol = v; const k = ambWant; ambWant = null; this.amb(k); },

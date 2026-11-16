@@ -14,6 +14,8 @@ from collections import deque
 SOLID = set("T~RWwfSPbr#ZXUYLKCg")
 W, H = 190, 110
 CUT_X, CUT_Y = 100, 50
+BLD_KINDS = {}
+PAVE_ZONES = [(44, 81, 77, 97, "ash"), (83, 17, 99, 31, "grey")]   # town streets drawn as paving: x0, y0, x1, y1, style   # "x,y" of a building's top-left -> its kind (how the bake dresses it); filled by main()
 
 
 class Grid:
@@ -138,6 +140,7 @@ def main():
                 if ((x - cx) / r) ** 2 + ((y - cy) / ry) ** 2 <= 1 and G.get(x, y) in set("Tbr"):
                     G.set(x, y, grass(rnd))
     props, signs, chests, camps = [], {}, [], []
+    bld_kinds = BLD_KINDS; bld_kinds.clear()
 
     def sign(x, y, *lines):
         G.set(x, y, "S"); signs[(x, y)] = list(lines)
@@ -173,11 +176,55 @@ def main():
     # signpost at the Ashford turn, and Ashford's gate at the end of its spur
     sign(46, 70, "South-east: Ashford. A Pillar town, under the protection of the Covenant.", "North-east: the crossroads, Greywick and Fort Frostcrown.")
     clear_round(59, 79, 5, 4)
-    for (x, y) in [(56, 80), (57, 80), (60, 80), (61, 80), (56, 81), (61, 81)]:
-        G.set(x, y, "#")
+    # Ashford seen from outside: its north wall (three tiles thick, the gate in the middle), and the town behind it,
+    # roofs and a chapel, with a street running south from the gate. Trees close the far side; the river the east.
+    def wall(x0, x1, y0, y1):
+        for y in range(y0, y1 + 1):
+            for x in range(x0, x1 + 1):
+                G.set(x, y, "F")
+    def house(x0, x1, y0, y1, kind=None):
+        """roof rows over one wall row along the bottom; windows every other tile"""
+        for y in range(y0, y1 + 1):
+            for x in range(x0, x1 + 1):
+                G.set(x, y, "W" if y == y1 and (x - x0) % 2 == 0 else "w" if y == y1 else "R")
+        if kind: bld_kinds[f"{x0},{y0}"] = kind
+    # Oakhaven's east gate, on the west edge: its wall runs north and south of the road with the backs of its houses
+    # beyond, and the road passes through the gap (the warp at the very edge keeps the gate barred while it rebuilds)
+    for y in range(60, 97):
+        for x in range(0, 7):
+            if not (77 <= y <= 79 and x <= 6): G.set(x, y, grass(rnd))
+    wall(3, 4, 60, 75); wall(3, 4, 81, 96)
+    for (x0, y0) in [(0, 61), (0, 66), (0, 71), (0, 82), (0, 87), (0, 92)]:
+        house(x0, 2, y0, y0 + 2, "cottage")
+    for y in (60, 65, 70, 75, 76, 80, 81, 86, 91, 96):
+        for x in (0, 1, 2):
+            if G.get(x, y) not in set("RWw"): G.set(x, y, "T" if y in (60, 96) else G.get(x, y))
+    for (x, y) in [(6, 76), (6, 80)]:
+        props.append({"p": "lamp", "x": x, "y": y})
+    G.set(5, 75, "S")                                                         # the first sign stays by the gate
+    for y in range(83, 99):
+        for x in range(44, 78):
+            G.set(x, y, grass(rnd) if y < 96 else "T")
+    wall(44, 77, 80, 82)
     for x in (58, 59):
-        G.set(x, 80, "G")                                                     # Ashford's north gate stands open by day
-    sign(62, 79, "Ashford.", "Gate shut at dusk by order of the Curate.")
+        for y in (80, 81, 82):
+            G.set(x, y, "H")                                                  # the north gate, open by day
+    wall(44, 46, 83, 97)                                                      # the west wall runs south to the woods
+    for y in range(83, 96):
+        for x in (57, 58, 59, 60):
+            G.set(x, y, "=")                                                  # the street south from the gate
+    for x in range(47, 77):
+        G.set(x, 89, "=")                                                     # and the cross street
+    for (x0, x1, y0, y1, k) in [(47, 50, 83, 85, "cottage"), (52, 55, 83, 85, "apoth"), (62, 65, 83, 85, "tailor"), (67, 70, 83, 85, "cottage"), (72, 76, 83, 85, "inn"),
+                                (47, 51, 90, 93, "chapel"), (53, 55, 91, 93, "cottage"), (62, 67, 90, 93, "outpost"), (69, 72, 91, 93, "store"), (74, 76, 91, 93, "cooper")]:
+        house(x0, x1, y0, y1, k)
+    for y in range(83, 96):
+        G.set(77, y, "T")
+    for (x, y) in [(56, 79), (61, 79)]:
+        props.append({"p": "banner", "x": x, "y": y})                        # the Covenant's banners either side of the gate
+    for (x, y) in [(55, 79), (62, 79)]:
+        props.append({"p": "lamp", "x": x, "y": y})
+    sign(63, 79, "Ashford.", "Gate shut at dusk by order of the Curate.")
     feats["ashford_gate"] = (58, 79)
     # hunters' camp (28,56)
     clear_round(28, 56, 6, 4); camps.append({"x": 28, "y": 56, "r": 3})
@@ -252,10 +299,26 @@ def main():
     feats["ambush"] = (60, 46)
     # Greywick's gate at the end of its spur
     clear_round(97, 31, 5, 4)
-    for (x, y) in [(94, 30), (95, 30), (98, 30), (99, 30), (94, 29), (99, 29)]:
-        G.set(x, y, "#")
-    for x in (96, 97):
-        G.set(x, 30, "G")                                                     # Greywick's gate hangs open
+    # Greywick seen from outside: a lower, older wall with its gate hanging open, the fronts of its houses over it,
+    # and the forest at its back. The town keeps to the west of the quarter seam (x 100).
+    for y in range(17, 28):
+        for x in range(83, 100):
+            G.set(x, y, grass(rnd) if y > 18 else "T")
+    for y in range(17, 31):
+        for x in range(100, 104):
+            if y < 28: G.set(x, y, "T")
+    wall(83, 103, 28, 30)
+    for x in (96, 97, 98):
+        for y in (28, 29, 30):
+            G.set(x, y, "H")
+    wall(83, 84, 19, 27)
+    for y in range(19, 28):
+        for x in (96, 97, 98):
+            G.set(x, y, "=")                                                  # the high street, through the gate
+    for (x0, x1, y0, y1, k) in [(86, 89, 20, 22, "boarded"), (91, 94, 19, 22, "lamphouse"), (86, 88, 24, 26, "shack"), (90, 94, 24, 26, "inn")]:
+        house(x0, x1, y0, y1, k)
+    for (x, y) in [(95, 31), (99, 31)]:
+        props.append({"p": "ubanner", "x": x, "y": y})
     sign(100, 31, "Greywick.", "Someone has painted over the Covenant's mark on this sign.")
     feats["greywick_gate"] = (97, 32)
     # overlook hill (114,44): the first view of the snow, a cache and a field Pillar at the Greywick turn
@@ -370,6 +433,8 @@ def cut(rows, props, signs, pillars, wild, camps):
             "pillars": [{**p, "tx": p["tx"] - x0, "ty": p["ty"] - y0} for p in pillars if owner(p["tx"], p["ty"]) == k],
             "wild": [loc(g) for g in wild if owner(g["x"], g["y"]) == k],
             "camps": [loc(c) for c in camps if owner(c["x"], c["y"]) == k],
+            "paveZones": [[a - x0, b - y0, c - x0, d - y0, st] for (a, b, c, d, st) in PAVE_ZONES if owner(a, b) == k],
+            "bldKinds": {f"{int(a) - x0},{int(b) - y0}": v for a, b, v in ((*key.split(","), v) for key, v in BLD_KINDS.items()) if owner(int(a), int(b)) == k},
             "warps": [],
         }
         out[k] = d
@@ -393,8 +458,8 @@ def cut(rows, props, signs, pillars, wild, camps):
         out["plainsSW"]["warps"].append({"x": 0, "y": y - CUT_Y, "to": "oak", "tx": 45, "ty": 18 if y < 79 else 19, "dir": "left",
                                          "lock": {"flag": "left_oak", "unless": "oak_rebuilt", "say": "The gate is barred from inside. A voice calls over it: \"Best come back later. The town needs rebuilding.\""}})
     # Greywick: through its gate at the end of the spur
-    for x in (96, 97):
-        out["plainsNW"]["warps"].append({"x": x, "y": 30, "to": "gw", "tx": x - 54, "ty": 64, "dir": "up"})
+    for x in (96, 97, 98):
+        out["plainsNW"]["warps"].append({"x": x, "y": 31, "to": "gw", "tx": min(43, x - 54), "ty": 64, "dir": "up"})
     # the East Light Forest: the trail runs off the east edge into the wood
     for y in (69, 70, 71):
         out["plainsSE"]["warps"].append({"x": W - 1 - CUT_X, "y": y - CUT_Y, "to": "eforest", "tx": 1, "ty": y - 43, "dir": "right"})
@@ -407,7 +472,7 @@ def cut(rows, props, signs, pillars, wild, camps):
             out["plainsNE"]["warps"].append({"x": x - CUT_X, "y": 0, "to": "os", "tx": min(51, max(46, x - CUT_X)), "ty": 58, "dir": "up"})
     # Ashford: through its open gate at the end of the spur
     for x in (58, 59):
-        out["plainsSW"]["warps"].append({"x": x, "y": 80 - CUT_Y, "to": "ash", "tx": x - 46, "ty": 3, "dir": "down"})
+        out["plainsSW"]["warps"].append({"x": x, "y": 79 - CUT_Y, "to": "ash", "tx": x - 46, "ty": 3, "dir": "down"})
     return out
 
 

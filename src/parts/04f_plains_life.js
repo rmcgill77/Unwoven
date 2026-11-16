@@ -10,6 +10,8 @@ for (const id in MAP_DEFS) for (const p of MAP_DEFS[id].pillars || []) if (!PILL
 /* what things say on the plains, where it differs from home */
 MAP_DEFS.plainsSW.looks = {
   barricade: ["Fallen timber, dragged across the trail and left. Beyond it the West Light Forest closes in, dark and quiet.", "Someone has carved a cut thread into the top log. (The West Forest opens in a later build.)"],
+  townwall: ["A town wall: dressed stone, kept in good repair. Over it, rooftops and chimney smoke."],
+  towngate: ["Ashford's north gate, open by day. Covenant banners hang either side, purple and gold.", "Beyond the arch: a cobbled street, roofs, the chapel's slate spire."],
   farm: ["A cellar door under fallen beams. The farm burned years ago; the tithe-men came the season after anyway."],
 };
 MAP_DEFS.plainsSE.looks = {
@@ -18,6 +20,8 @@ MAP_DEFS.plainsSE.looks = {
   wayfire: ["A ring of stones round old ash. Travellers stop here, but only after dark, and never for long."],
 };
 MAP_DEFS.plainsNW.looks = {
+  towngate: ["Greywick's gate hangs open on its hinges. Nobody stands watch.", "Someone has painted over the Covenant sigil on the arch. Badly, and recently."],
+  townwall: ["Greywick's wall: old stone, patched with timber where it has fallen. The roofs behind it sag."],
   gate: ["Greywick's gate hangs crooked on one hinge, tied shut with rope. (Greywick opens in a later build.)", "Someone has painted over the Covenant sigil on the crossbar. Badly, and recently."],
 };
 MAP_DEFS.plainsNE.looks = {

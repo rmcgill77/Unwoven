@@ -3,6 +3,20 @@
 /* streamed on demand from music/*.mp3, crossfaded, resumed per track.   */
 /* ------------------------------------------------------------------ */
 const MUSIC_FILES = { title: "music/title.mp3", journey: "music/journey.mp3", explore: "music/explore.mp3", dungeon: "music/dungeon.mp3", icy: "music/icy.mp3", battle: "music/battle.mp3", boss: "music/boss.mp3", rest: "music/rest.mp3", minigame: "music/minigame.mp3", final: "music/final.mp3" };
+/* The app is "away" while its page is hidden or the window has lost focus (another app, another tab, the
+   chat beside the artifact). Every sound is paused then and picks up where it was on return. */
+const AWAY = { on: false, subs: [] };
+const audioAway = () => AWAY.on;
+function setAudioAway(v) { v = !!v; if (v === AWAY.on) return; AWAY.on = v; AWAY.subs.forEach((f) => { try { f(v); } catch (e) { /* ignore */ } }); }
+if (typeof window !== "undefined" && typeof document !== "undefined") {
+  const check = () => setAudioAway(document.hidden || (document.hasFocus && !document.hasFocus()));
+  document.addEventListener("visibilitychange", check);
+  window.addEventListener("blur", () => setAudioAway(true));
+  window.addEventListener("focus", () => setAudioAway(!!document.hidden));
+  window.addEventListener("pagehide", () => setAudioAway(true));
+  window.addEventListener("pageshow", check);
+  ["pointerdown", "keydown", "touchstart"].forEach((ev) => window.addEventListener(ev, () => setAudioAway(!!document.hidden), { passive: true, capture: true }));
+}
 const Music = (() => {
   const els = {}; let want = null, vol = 0.5, cur = null, timer = 0, blocked = false;
   const mk = (k) => {
@@ -20,9 +34,13 @@ const Music = (() => {
   };
   const run = () => { if (!timer) timer = setInterval(tick, 50); };
   const start = (k) => {
-    const a = mk(k); if (!a) return;
+    const a = mk(k); if (!a || AWAY.on) return;
     if (a.paused) { const p = a.play(); if (p && p.catch) p.catch(() => { blocked = true; run(); }); }
   };
+  AWAY.subs.push((away) => {
+    if (away) { for (const k of Object.keys(els)) if (!els[k].paused) els[k].pause(); }
+    else if (want && vol > 0) { const a = mk(want); if (a) { a.volume = Math.max(a.volume, 0.05); start(want); } run(); }
+  });
   const unlock = () => { if (blocked && want && vol > 0) { blocked = false; start(want); run(); } };
   if (typeof window !== "undefined") { ["pointerdown", "keydown", "touchend"].forEach((ev) => window.addEventListener(ev, unlock, { passive: true })); }
   return {

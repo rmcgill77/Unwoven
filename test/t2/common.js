@@ -6,6 +6,7 @@ async function boot(opts = {}) {
   const pg = await b.newPage({ viewport: opts.viewport || { width: 915, height: 412 }, deviceScaleFactor: opts.dsf || 2 });
   const errs = []; pg.on('pageerror', (e) => errs.push(String(e))); pg.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
   await pg.addInitScript((s) => { if (!localStorage.getItem('durinn.save.v1')) localStorage.setItem('durinn.save.v1', JSON.stringify(s)); localStorage.setItem('durinn.settings.v2', JSON.stringify({ debug: false, fps: false, touch: 'off', wait: true, music: 0 })); }, opts.save || SAVE);
+  if (opts.dev !== false) await pg.addInitScript(() => { try { localStorage.setItem('durinn.dev.v1', JSON.stringify('c9qf3wh51z')); } catch (e) { /* ignore */ } });
   await pg.goto('file://' + require('path').resolve(__dirname, '../../build/test.html'));
   await pg.waitForSelector('#dz-title-continue', { timeout: 30000 }).catch(async () => { await pg.mouse.click(400, 200); await pg.waitForSelector('#dz-title-continue', { timeout: 30000 }); });
   await pg.click('#dz-title-continue'); await pg.waitForTimeout(900);
@@ -14,6 +15,7 @@ async function boot(opts = {}) {
 async function jump(pg, id) {
   await pg.click('#dz-menu'); await pg.waitForTimeout(200);
   if (await pg.$('#dz-tab-settings')) await pg.click('#dz-tab-settings');
+  if (await pg.$('#dz-dev-pass')) { if (!process.env.DEV_PW) throw new Error('developer tools are locked: set DEV_PW or run with opts.dev'); await pg.fill('#dz-dev-pass', process.env.DEV_PW); await pg.click('#dz-dev-go'); await pg.waitForTimeout(150); }
   if (!(await pg.$('#dz-jump-' + id))) await pg.click('#dz-tools');
   await pg.click('#dz-jump-' + id); await pg.waitForTimeout(1400);
 }

@@ -21,6 +21,13 @@ const WZ = 2;                // world zoom: tiles drawn at 2x so chibi sprites s
 const MIN_PER_SEC = 1.25;    // in-game minutes per real second while exploring
 const SAVE_KEY = "durinn.save.v1";
 const SETTINGS_KEY = "durinn.settings.v2";
+/* Developer tools sit behind a password. Only a stretched hash of it is kept here, and the unlock is remembered
+   per device. This keeps testers out of the tools; it is not real security (everything runs on their device). */
+const DEV_KEY = "durinn.dev.v1", DEV_HASH = "c9qf3wh51z";
+function devHash(pw) {
+  const cy = (str, seed) => { let h1 = 0xdeadbeef ^ seed, h2 = 0x41c6ce57 ^ seed; for (let i = 0, ch; i < str.length; i++) { ch = str.charCodeAt(i); h1 = Math.imul(h1 ^ ch, 2654435761); h2 = Math.imul(h2 ^ ch, 1597334677); } h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507); h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909); h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507); h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909); return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36); };
+  let h = String(pw || ""); for (let i = 0; i < 5000; i++) h = cy(h + "|unwoven", i); return h;
+}
 const SAVE_VERSION = 1;
 
 /* ------------------------------------------------------------------ */

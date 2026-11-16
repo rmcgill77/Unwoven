@@ -127,3 +127,6 @@ Third-party licensed packs live in assets/ ... assets14/ on the author's machine
 - d98b1275
 - e196a1a3
 - f8f4fde3
+
+## assets15
+- craftpix Free Top-Down Trees pixel art (baked into src/parts/02r_tree_data.js by concept/tree_bake.py)

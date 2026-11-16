@@ -148,7 +148,7 @@ assert not bad, bad
 for name, xy in {"pillar": (27, 31), "graveyard": (37, 12), "chapelback": (3, 26), "hides": (44, 45), "stall": (25, 44)}.items():
     assert xy in ok, (name, xy)
 
-warps = [{"x": 42, "y": H - 1, "to": "plainsNW", "tx": 96, "ty": 31, "dir": "down"}, {"x": 43, "y": H - 1, "to": "plainsNW", "tx": 97, "ty": 31, "dir": "down"}]
+warps = [{"x": 42, "y": H - 1, "to": "plainsNW", "tx": 96, "ty": 32, "dir": "down"}, {"x": 43, "y": H - 1, "to": "plainsNW", "tx": 97, "ty": 32, "dir": "down"}]
 d = {"name": "Greywick", "outside": True, "town": True, "pave": "grey", "act2": True, "snowY0": 0, "snowLevel": 0.78,
      "rows": rows, "props": props, "signs": signs, "warps": warps, "graveyard": graveyard,
      "doorKinds": {f"{x},{y}": k for (x, y), k in doors.items()},

@@ -1,6 +1,6 @@
 {
   "name": "unwoven",
-  "version": "0.2.0-act2",
+  "version": "0.2.1-act2",
   "private": true,
   "description": "Unwoven: A Tale of Talvora. A mobile-first pixel RPG (Acts One and Two) with ATB battles and Old Tongue word magic.",
   "scripts": {

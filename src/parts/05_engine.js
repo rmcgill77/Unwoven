@@ -591,8 +591,8 @@ function createEngine(canvas, root, hooks) {
     if (c === "P") { const pl = nearestPillar(m.def, tx * TILE + 8, ty * TILE + 8); if (pl) return { kind: "look", key: "pillar:" + pl.id, x: pl.x, y: pl.base - 50 }; }
     if (c === "g") return { kind: "look", key: "gate", x: tx * TILE + 8, y: ty * TILE - 2 };
     if (c === "Z") return { kind: "look", key: "barricade", x: tx * TILE + 8, y: ty * TILE - 2 };
-    if (c === "H") return { kind: "look", key: ty < 25 ? "northgate" : "southgate", x: tx * TILE + 8, y: ty * TILE - 2 };
-    if (c === "F") return { kind: "look", key: "fortwall", x: tx * TILE + 8, y: ty * TILE - 2 };
+    if (c === "H") return { kind: "look", key: m.def.fort ? (ty < 25 ? "northgate" : "southgate") : "towngate", x: tx * TILE + 8, y: ty * TILE - 2 };
+    if (c === "F") return { kind: "look", key: m.def.fort ? "fortwall" : "townwall", x: tx * TILE + 8, y: ty * TILE - 2 };
     if (c === "c") {
       if (s.G && TRADES[s.G.trade].fieldStation) return { kind: "station", x: tx * TILE + 8, y: ty * TILE - 2 };
       return { kind: "look", key: "crops", x: tx * TILE + 8, y: ty * TILE - 2 };
@@ -855,6 +855,7 @@ function createEngine(canvas, root, hooks) {
     const set = (el, txt) => { if (el && el.textContent !== txt) el.textContent = txt; };
     set(h.place, fillText(s.map.def.name, buildVars(G)));
     set(h.time, `Day ${G.day} · ${isNightT(G.time) ? "Night" : "Day"}`);
+    if (h.time && h.time.parentNode) { const nv = isNightT(G.time) ? "1" : "0"; if (h.time.parentNode.dataset.night !== nv) h.time.parentNode.dataset.night = nv; }
     set(h.coins, `${G.coins} coppers`);
     set(h.ley, r.label);
     if (h.bar) { h.bar.style.width = Math.round(r.value * 100) + "%"; h.bar.dataset.wild = r.wild ? "1" : "0"; }
