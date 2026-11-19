@@ -33,6 +33,34 @@ const HUD_CSS = `
 .hd-sec.dz-task small{color:#9a8571}
 .hd-tasklbl{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:#ffd569}
 @media (max-height:380px){.dz-hud{width:min(212px,calc(100% - 90px))}.hd-sec{padding:2px 7px 3px 11px!important}.hd-sec.dz-task small{display:none}}
+/* V93: one slim card; it fades while the player walks and comes back when they stop */
+.dz-hud.nh{width:min(214px,calc(100% - 200px));gap:5px;transition:opacity .45s ease}
+.dz-hud.nh[data-walk="1"]{opacity:.35}
+.nh-card{padding:5px 8px 6px;display:grid;gap:3px}
+.nh-card .dz-zone{font-size:11px;line-height:1.25;color:#ffd569;text-shadow:0 2px 0 #25131a;letter-spacing:.1em}
+.nh-card .dz-time{font-size:11px;color:#e9d9c4;align-items:center}
+.nh-card .dz-time b{color:#e39a3a}
+.nh-card .hd-ico{width:18px;height:18px;transform:scale(.8);margin:-2px -2px}
+.nh-meter{display:grid;grid-template-columns:14px 1fr auto;align-items:center;gap:5px;font-size:9px;color:var(--muted)}
+.nh-meter>span{max-width:62px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}
+.nh-bar{height:5px!important;background:var(--ink)!important;box-shadow:0 0 0 1px var(--edge)!important}
+.nh-bar>i{background:var(--ley)!important;filter:none!important}
+.nh-bar>i[data-wild="1"]{background:var(--ember)!important}
+.nh-dia{width:7px;height:7px;transform:rotate(45deg);background:var(--ley);box-shadow:0 0 0 2px var(--ink);margin-left:3px}
+.nh-dia[data-k="scr"]{background:#c0505a}
+.nh-scr .nh-bar>i{background:#c0505a!important}
+.nh-pips{display:grid;grid-template-columns:repeat(var(--n,1),1fr);gap:5px;margin-top:2px}
+.nh-pip{display:grid;grid-template-columns:18px 1fr;gap:4px;align-items:center}
+.nh-face{width:18px;height:18px;overflow:hidden;box-shadow:0 0 0 1px var(--edge);background:#2a2436;display:grid;place-items:start center}
+.nh-face>*{margin-top:-1px}
+.nh-hp{height:4px;background:var(--ink);box-shadow:0 0 0 1px var(--edge);position:relative}
+.nh-hp>i{position:absolute;left:0;top:0;bottom:0;background:#7aa84a}
+.nh-hp>i[data-low="1"]{background:#e0b850}.nh-hp>i[data-low="2"]{background:#c0505a}
+.nh-task.dz-task{padding:4px 8px 5px;font-size:11px;line-height:1.3;color:#e9d9c4;grid-template-columns:12px 1fr;column-gap:6px;display:grid}
+.nh-task.dz-task::before{content:"◆";color:#e0b850;font-size:10px;grid-row:1/3;padding-top:1px}
+.nh-task.dz-task small{color:#9a8571;font-size:10px;grid-column:2}
+@media (max-height:380px){.nh-task.dz-task small{display:none}.nh-card{gap:2px;padding:4px 7px 5px}}
+
 `;
 const CSS = `
 .dz-root{--ink:${PAL.ink};--night:${PAL.night};--panel:#241e36;--panel2:#2c2542;--edge:#3f3658;--text:${PAL.white};--muted:#b4a8c8;--ley:${PAL.ley};--ember:${PAL.ember};--parch:${PAL.parch};--good:${PAL.leafL};--bad:${PAL.flowerR};
@@ -87,9 +115,9 @@ const CSS = `
 .dz-btn-pack span,.dz-btn-book span{font-size:11px}
 .dz-btn-book{width:54px;height:54px;right:calc(32px + env(safe-area-inset-right,0px));bottom:calc(184px + env(safe-area-inset-bottom,0px));background:var(--night);color:var(--text);box-shadow:inset 0 0 0 2px var(--edge)}
 .dz-btn-b{width:58px;height:58px;right:calc(108px + env(safe-area-inset-right,0px));bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ley);font-size:19px}
-.dz-dn{position:absolute;top:calc(10px + env(safe-area-inset-top,0px));right:calc(62px + env(safe-area-inset-right,0px));height:44px;padding:0 12px;border:2px solid var(--ink);background:var(--panel);box-shadow:inset 0 0 0 2px var(--edge);color:var(--text);font:inherit;font-size:14px;cursor:pointer;display:flex;align-items:center;gap:6px}
+.dz-dn{position:absolute;top:calc(10px + env(safe-area-inset-top,0px));right:calc(202px + env(safe-area-inset-right,0px));height:44px;padding:0 12px;border:2px solid var(--ink);background:var(--panel);box-shadow:inset 0 0 0 2px var(--edge);color:var(--text);font:inherit;font-size:14px;cursor:pointer;display:flex;align-items:center;gap:6px}
 .dz-dn i{font-style:normal;font-size:16px}
-.dz-menu-btn{position:absolute;top:calc(10px + env(safe-area-inset-top,0px));right:calc(10px + env(safe-area-inset-right,0px));width:44px;height:44px;border:2px solid var(--ink);background:var(--panel);box-shadow:inset 0 0 0 2px var(--edge);color:var(--text);font-size:18px;cursor:pointer;display:grid;place-items:center}
+.dz-menu-btn{position:absolute;top:calc(10px + env(safe-area-inset-top,0px));right:calc(150px + env(safe-area-inset-right,0px));width:44px;height:44px;border:2px solid var(--ink);background:var(--panel);box-shadow:inset 0 0 0 2px var(--edge);color:var(--text);font-size:18px;cursor:pointer;display:grid;place-items:center}
 .dz-root button:focus-visible,.dz-root input:focus-visible{outline:2px solid var(--ley);outline-offset:2px}
 .dz-dialog{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom,0px));width:min(720px,calc(100% - 24px));padding:12px 14px;display:flex;gap:12px;align-items:flex-start;cursor:pointer}
 .dz-portrait .dz-pix{width:100%!important;height:100%!important}
@@ -105,7 +133,143 @@ const CSS = `
 .dz-choice{text-align:left;font-size:15px;color:var(--text);background:var(--night);border:2px solid var(--edge);padding:7px 10px;cursor:pointer}
 .dz-choice[data-sel="1"]{border-color:var(--parch);background:var(--panel2)}
 .dz-choice[data-sel="1"]::before{content:"\\25B6  ";color:var(--ley)}
-.dz-toast{position:absolute;bottom:calc(22px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);padding:9px 16px;font-size:16px;line-height:1.3;font-weight:600;color:var(--ink);background:var(--parch);border:2px solid var(--ink);box-shadow:0 0 0 2px var(--edge),0 4px 0 rgba(10,6,22,.6);pointer-events:none;text-align:center;width:max-content;max-width:clamp(240px,calc(100% - 420px),460px);z-index:5;animation:dztoast .22s ease-out}
+/* V93 dialogue: a big framed portrait standing out of the box, a name plate on its edge, choices as paper tabs */
+.dz-dialog.nd{padding:14px 16px 26px 16px;min-height:104px;overflow:visible}
+.dz-dialog.nd[data-port="1"]{padding-left:178px}
+.nd-port.dz-portrait{position:absolute;left:12px;bottom:12px;width:152px;height:152px;background:#241e36;box-shadow:0 0 0 2px var(--ink),inset 0 0 0 2px var(--ember),0 4px 0 var(--ink);place-items:end center}
+.dz-dialog.nd[data-port="1"] .dz-dbody{justify-items:stretch;text-align:left;padding:4px 6px 0}.dz-dialog.nd[data-port="0"] .dz-dbody{padding:4px 6px 0}.dz-dialog.nd[data-port="0"] .dz-text{text-align:center}
+.nd-plate.dz-name{position:absolute;left:178px;top:-15px;font-size:13px;padding:3px 12px 4px;border:2px solid var(--ink);box-shadow:0 2px 0 var(--ink)}
+.dz-dialog.nd .dz-text{font-size:16px;line-height:1.42;min-height:2.84em}
+.nd-ctl{position:absolute;right:10px;bottom:5px;display:flex;gap:5px;align-items:center;font-size:10px;color:var(--muted)}
+.nd-ctl button{font-size:10px;padding:1px 7px;color:var(--muted);background:transparent;border:1px solid var(--edge);cursor:pointer;letter-spacing:.06em;text-transform:uppercase}
+.nd-ctl button[data-on="1"]{color:var(--ink);background:var(--ley);border-color:var(--ink)}
+.nd-skip{opacity:.75;margin-right:3px}
+.nd-tabs.dz-choices{position:absolute;right:-2px;bottom:calc(100% + 8px);display:grid;gap:5px;justify-items:end;max-width:min(470px,72%)}
+.nd-tabs .dz-choice{position:relative;min-width:230px;text-align:left;font-size:14px;color:#2a1c12;padding:7px 24px 7px 14px;border:2px solid var(--ink);border-right:0;background:linear-gradient(180deg,#e4d6b4,#c9b78e);box-shadow:inset 0 -3px 0 rgba(0,0,0,.15),-2px 2px 0 var(--ink);transition:transform .12s ease}
+.nd-tabs .dz-choice::after{content:"";position:absolute;right:-12px;top:-2px;bottom:-2px;width:12px;background:#4a2e22;border:2px solid var(--ink);border-left:0}
+.nd-tabs .dz-choice b{color:#7a2a20;margin-right:9px;font-weight:600}
+.nd-tabs .dz-choice[data-sel="1"]{transform:translateX(-14px);background:linear-gradient(180deg,#f2e6c8,#e4d6b4);border-color:var(--ink)}
+.nd-tabs .dz-choice[data-sel="1"]::before{content:none}
+.nd-log{width:min(620px,100%)}.nd-logbody{max-height:min(60vh,420px);overflow:auto;display:grid;gap:8px;font-size:14px;line-height:1.4}
+.nd-logbody b{display:block;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--parch);font-weight:500}
+.nd-logbody p[data-narr="1"]{color:var(--parch);font-style:italic}
+@media (max-height:380px){.dz-dialog.nd[data-port="1"]{padding-left:128px}.nd-port.dz-portrait{width:106px;height:106px}.nd-plate.dz-name{left:128px}.dz-dialog.nd .dz-text{font-size:14px}.dz-dialog.nd{min-height:84px;padding-bottom:22px}}
+/* V93 battle: plates over the foes, the turn-order strip, status icons, command tiles, the victory card */
+.dz-btop.nb{position:absolute;inset:0;padding:0;margin:0;background:none;box-shadow:none;border:0;max-width:none;min-width:0;display:block;pointer-events:none;overflow:visible;z-index:3}
+.dz-btop.nb .dz-bfoe{position:absolute;left:-999px;top:0;display:grid;grid-template-columns:auto auto auto 1fr;grid-template-rows:auto auto;align-items:center;column-gap:5px;row-gap:2px;min-width:118px;max-width:190px;padding:3px 7px 5px;font-size:12px;white-space:nowrap}
+.dz-btop.nb .dz-bfoe b{font-size:12px}.dz-btop.nb .dz-bfoe>span{font-size:10px}
+.dz-btop.nb .dz-bbadge{display:none}
+.dz-btop.nb .dz-bcond{grid-column:1/-1;font-size:10px}
+.dz-btop.nb .dz-bhp{grid-column:1/-1;min-width:0;height:5px}
+.dz-btop.nb .dz-bhp i{background:#c0505a}
+.dz-bst{display:inline-flex;gap:2px}.dz-bst:empty{display:none}
+.dz-bst b{display:inline-grid;place-items:center;width:14px;height:14px;font-size:9px;font-weight:500;color:#fff;box-shadow:0 0 0 1px #0f0d14;line-height:1}
+.dz-border{position:absolute;left:50%;transform:translateX(-50%);top:calc(8px + env(safe-area-inset-top,0px));display:flex;align-items:center;gap:4px;padding:4px 8px;z-index:4;pointer-events:none}
+.dz-border:empty{display:none}
+.bo-lb{font-size:10px;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-right:3px}
+.bo-chip{width:28px;height:28px;background:#2a2436 50% 12%/180% auto no-repeat;image-rendering:pixelated;box-shadow:0 0 0 2px #0f0d14,inset 0 0 0 2px var(--ley)}
+.bo-chip[data-side="e"]{background-size:150% auto;background-position:50% 30%;box-shadow:0 0 0 2px #0f0d14,inset 0 0 0 2px #c0505a}
+.bo-chip[data-now="1"]{width:36px;height:36px;outline:2px solid #e0b850;outline-offset:1px}
+.dz-blog{top:calc(58px + env(safe-area-inset-top,0px))}
+.dz-bcmd[data-stage="cmd"]{grid-template-columns:repeat(3,minmax(92px,1fr));gap:6px;min-width:min(360px,46vw)}
+.dz-bcmd[data-stage="cmd"] .dz-bc{min-height:44px;display:flex;align-items:center;justify-content:center;gap:7px;font-size:15px;text-align:center;padding:4px 8px;background:#2c2542;border:2px solid #0f0d14;box-shadow:inset 0 0 0 2px var(--edge),inset 0 -4px 0 rgba(0,0,0,.25)}
+.dz-bcmd[data-stage="cmd"] .dz-bc::before{content:attr(data-g)!important;position:static!important;color:var(--parch)!important;font-size:15px!important}
+.dz-bcmd[data-stage="cmd"] .dz-bc:hover:not(:disabled),.dz-bcmd[data-stage="cmd"] .dz-bc:focus-visible{background:#6a2e24;box-shadow:inset 0 0 0 2px var(--ember),inset 0 -4px 0 rgba(0,0,0,.25)}
+.dz-bcmd[data-stage="cmd"] #dz-c-attack{background:#5a2a22;box-shadow:inset 0 0 0 2px var(--ember),inset 0 -4px 0 rgba(0,0,0,.25)}
+.dz-bcmd:not([data-stage="cmd"]) .dz-bc{min-height:34px}
+.dz-brow .dz-bst{margin-top:2px}
+.bv{display:grid;gap:8px;min-width:min(440px,80vw)}
+.bv-h{display:block!important;width:100%;font-size:26px!important;letter-spacing:.3em;text-align:center!important;color:#e0b850!important;text-shadow:0 3px 0 #0f0d14}
+.bv-sub{text-align:center;font-size:12px;color:var(--muted);margin-top:-6px}
+.bv-xp{display:grid;gap:6px}
+.bv-row{display:grid;grid-template-columns:36px 76px 1fr 76px;gap:8px;align-items:center;font-size:13px}
+.bv-face{width:36px;height:36px;overflow:hidden;box-shadow:0 0 0 2px #0f0d14,inset 0 0 0 1px var(--edge);background:#2a2436;display:grid;place-items:start center}
+.bv-bar{height:8px;background:var(--ink);box-shadow:0 0 0 1px var(--edge);position:relative}.bv-bar i{position:absolute;left:0;top:0;bottom:0;background:var(--ley);transition:width .8s ease}
+.bv-bar i[data-up="1"]{background:#e0b850}
+.bv-v{text-align:right;color:var(--ley);font-size:12px}.bv-v[data-up="1"]{color:#e0b850}
+.bv-loot{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;margin-top:4px}
+.bv-item{width:78px;padding:6px 4px 5px;display:grid;justify-items:center;gap:3px;font-size:10px;line-height:1.2;text-align:center;background:var(--night);box-shadow:inset 0 0 0 2px var(--edge)}
+.bv-item[data-k="coin"] b{font-size:24px;line-height:32px;color:#e0b850;font-weight:400}.bv-item[data-k="coin"]{color:#e0b850}
+.bv-none{font-size:12px;color:var(--muted)}
+/* V93 touch: every control scales with the size setting, and the left-handed layout mirrors the sides */
+.dz-ctl{--ck:1.2}
+.dz-ctl .dz-joy-base{width:calc(104px * var(--ck));height:calc(104px * var(--ck));margin:calc(-52px * var(--ck)) 0 0 calc(-52px * var(--ck))}
+.dz-ctl .dz-joy-knob{width:calc(46px * var(--ck));height:calc(46px * var(--ck));margin:calc(-23px * var(--ck)) 0 0 calc(-23px * var(--ck))}
+.dz-ctl .dz-btn-a{width:calc(74px * var(--ck));height:calc(74px * var(--ck));right:calc(22px * var(--ck) + env(safe-area-inset-right,0px));bottom:calc(34px * var(--ck) + env(safe-area-inset-bottom,0px))}
+.dz-ctl .dz-btn-b{width:calc(58px * var(--ck));height:calc(58px * var(--ck));right:calc(108px * var(--ck) + env(safe-area-inset-right,0px));bottom:calc(20px * var(--ck) + env(safe-area-inset-bottom,0px))}
+.dz-ctl .dz-btn-pack{width:calc(54px * var(--ck));height:calc(54px * var(--ck));right:calc(32px * var(--ck) + env(safe-area-inset-right,0px));bottom:calc(120px * var(--ck) + env(safe-area-inset-bottom,0px))}
+.dz-ctl .dz-btn-book{width:calc(54px * var(--ck));height:calc(54px * var(--ck));right:calc(32px * var(--ck) + env(safe-area-inset-right,0px));bottom:calc(184px * var(--ck) + env(safe-area-inset-bottom,0px))}
+.dz-ctl[data-lefty="1"] .dz-btn-a{right:auto;left:calc(22px * var(--ck) + env(safe-area-inset-left,0px))}
+.dz-ctl[data-lefty="1"] .dz-btn-b{right:auto;left:calc(108px * var(--ck) + env(safe-area-inset-left,0px))}
+/* left-handed, and the largest size: Book and Pack sit in the bottom row beside the action buttons, clear of the HUD and the map */
+.dz-ctl[data-lefty="1"] .dz-btn-pack,.dz-ctl[data-lefty="1"] .dz-btn-book,.dz-ctl[data-row="1"] .dz-btn-pack,.dz-ctl[data-row="1"] .dz-btn-book{width:calc(48px * var(--ck))!important;height:calc(48px * var(--ck))!important;bottom:calc(14px * var(--ck) + env(safe-area-inset-bottom,0px))!important}
+.dz-ctl[data-lefty="1"] .dz-btn-pack{right:auto!important;left:calc(176px * var(--ck) + env(safe-area-inset-left,0px))!important}
+.dz-ctl[data-lefty="1"] .dz-btn-book{right:auto!important;left:calc(232px * var(--ck) + env(safe-area-inset-left,0px))!important}
+.dz-ctl[data-row="1"]:not([data-lefty="1"]) .dz-btn-pack{right:calc(176px * var(--ck) + env(safe-area-inset-right,0px))!important}
+.dz-ctl[data-row="1"]:not([data-lefty="1"]) .dz-btn-book{right:calc(232px * var(--ck) + env(safe-area-inset-right,0px))!important}
+.dz-ctl .dz-btn span{font-size:calc(11.5px * var(--ck))}
+@media (max-height:400px){.dz-ctl .dz-btn-pack,.dz-ctl .dz-btn-book{width:calc(44px * var(--ck));height:calc(44px * var(--ck));right:calc(37px * var(--ck) + env(safe-area-inset-right,0px))}.dz-ctl .dz-btn-pack{bottom:calc(113px * var(--ck) + env(safe-area-inset-bottom,0px))}.dz-ctl .dz-btn-book{bottom:calc(162px * var(--ck) + env(safe-area-inset-bottom,0px))}.dz-ctl[data-lefty="1"] .dz-btn-pack,.dz-ctl[data-lefty="1"] .dz-btn-book{left:calc(37px * var(--ck) + env(safe-area-inset-left,0px))}.dz-ctl .dz-btn-pack span,.dz-ctl .dz-btn-book span{font-size:calc(10px * var(--ck))}}
+/* V93 pause menu: a rail of tabs down the left */
+.dz-panel.pm{display:grid;grid-template-columns:150px minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);column-gap:0;width:min(820px,100%)}
+.pm>.dz-prail{grid-row:1/3;grid-column:1;display:grid;align-content:start;gap:6px;padding:10px 8px;border-right:2px solid var(--edge);background:rgba(0,0,0,.18)}
+.pm>.dz-phead,.pm>.dz-pbody{grid-column:2}
+.dz-ptab{font:inherit;font-size:14px;text-align:left;color:var(--text);padding:8px 10px;border:2px solid var(--ink);background:var(--panel2);box-shadow:inset 0 0 0 2px var(--edge);cursor:pointer}
+.dz-ptab[aria-selected="true"]{background:#6a2e24;box-shadow:inset 0 0 0 2px var(--ember)}
+.dz-ptab:hover,.dz-ptab:focus-visible{color:var(--parch);outline:none}
+#dz-rail-quit{margin-top:8px;color:var(--muted)}
+.dz-srow{display:grid;grid-template-columns:110px 1fr;align-items:center;gap:10px;margin-top:6px}
+.dz-srow>span{font-size:13px;color:var(--muted)}
+.dz-ctlprev{position:relative;height:120px;margin-top:8px;background:rgba(0,0,0,.25);box-shadow:inset 0 0 0 1px var(--edge);overflow:hidden}
+.dz-ctlprev i{position:absolute;display:grid;place-items:center;border-radius:50%;font-style:normal;font-size:11px;color:var(--ink)}
+.dz-ctlprev .cp-joy{left:14px;bottom:10px;width:calc(52px * var(--ck));height:calc(52px * var(--ck));border:2px solid rgba(244,236,220,.4)}
+.dz-ctlprev .cp-joy b{width:45%;height:45%;border-radius:50%;background:var(--parch)}
+.dz-ctlprev .cp-a{right:12px;bottom:10px;width:calc(37px * var(--ck));height:calc(37px * var(--ck));background:var(--parch);box-shadow:0 0 0 2px var(--ink)}
+.dz-ctlprev .cp-b{right:calc(12px + 44px * var(--ck));bottom:6px;width:calc(29px * var(--ck));height:calc(29px * var(--ck));background:var(--ley);box-shadow:0 0 0 2px var(--ink)}
+.dz-ctlprev .cp-s,.dz-ctlprev .cp-s2{right:16px;width:calc(22px * var(--ck));height:calc(22px * var(--ck));background:var(--night);box-shadow:inset 0 0 0 2px var(--edge)}
+.dz-ctlprev .cp-s{bottom:calc(14px + 38px * var(--ck))}.dz-ctlprev .cp-s2{bottom:calc(18px + 60px * var(--ck))}
+.dz-ctlprev[data-lefty="1"] .cp-s,.dz-ctlprev[data-lefty="1"] .cp-s2{bottom:10px!important}.dz-ctlprev[data-lefty="1"] .cp-s{left:calc(16px + 80px * var(--ck))!important}.dz-ctlprev[data-lefty="1"] .cp-s2{left:calc(20px + 106px * var(--ck))!important}
+.dz-ctlprev[data-lefty="1"] .cp-joy{left:auto;right:14px}
+.dz-ctlprev[data-lefty="1"] .cp-a{right:auto;left:12px}.dz-ctlprev[data-lefty="1"] .cp-b{right:auto;left:calc(12px + 44px * var(--ck))}
+.dz-ctlprev[data-lefty="1"] .cp-s,.dz-ctlprev[data-lefty="1"] .cp-s2{right:auto;left:16px}
+@media (max-width:700px){.dz-panel.pm{grid-template-columns:118px minmax(0,1fr)}.dz-ptab{font-size:12px;padding:6px 7px}}
+/* V93 title: the card at the left over the living town, embers drifting up, and the save shown as a slot */
+.dz-title.nt{place-items:center start;padding:16px 16px 16px max(28px,6vw);background:linear-gradient(90deg,rgba(15,13,20,.82),rgba(15,13,20,.35) 55%,rgba(15,13,20,.1))}
+.dz-title.nt .dz-tcard{width:min(370px,100%)}
+.nt-embers{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.nt-embers i{position:absolute;bottom:-10px;width:3px;height:3px;background:#f0a050;box-shadow:0 0 6px 2px rgba(240,140,60,.55);animation:ntember linear infinite;opacity:0}
+@keyframes ntember{0%{transform:translate(0,0);opacity:0}10%{opacity:.9}70%{opacity:.6}100%{transform:translate(-40px,-110vh);opacity:0}}
+.nt-slot{width:100%;display:grid;grid-template-columns:58px 1fr;gap:9px;align-items:center;text-align:left;padding:7px;background:var(--night);box-shadow:inset 0 0 0 2px #e0b850}
+.nt-face{width:58px;height:58px;overflow:hidden;box-shadow:0 0 0 2px var(--ink),inset 0 0 0 1px var(--edge);background:#2a2436;display:grid;place-items:start center}
+.nt-info{display:grid;gap:1px;min-width:0;font-size:12px;line-height:1.3}
+.nt-info b{font-size:15px;font-weight:500;color:var(--parch)}
+.nt-info span{color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nt-info small{color:var(--muted);font-size:11px}
+.nt-party{display:flex;gap:4px;margin-top:3px}
+.nt-party span{width:22px;height:22px;overflow:hidden;box-shadow:0 0 0 1px var(--edge);background:#2a2436;display:grid;place-items:start center}
+@media (max-height:380px){.nt-slot{grid-template-columns:44px 1fr;padding:5px}.nt-face{width:44px;height:44px}.nt-info{font-size:11px}.nt-info b{font-size:13px}}
+.dz-mini{position:absolute;top:calc(10px + env(safe-area-inset-top,0px));right:calc(10px + env(safe-area-inset-right,0px));width:132px;height:100px;padding:3px;cursor:pointer;transition:opacity .3s}
+.dz-mini[data-hide="1"]{opacity:0;pointer-events:none}
+.dz-mini canvas{display:block;width:100%;height:100%;image-rendering:pixelated}
+.dz-mini-n{position:absolute;left:6px;top:4px;font-size:9px;color:var(--parch);text-shadow:0 1px 0 #000,1px 0 0 #000}
+.dz-amap{width:min(860px,100%)}
+.dz-amap-body{position:relative;height:min(64vh,340px)}
+.dz-amap-body canvas{width:100%;height:100%;display:block;image-rendering:pixelated}
+.dz-amap-key{position:absolute;left:8px;bottom:8px;padding:6px 8px;display:grid;gap:3px;font-size:11px;background:rgba(20,16,28,.9);box-shadow:inset 0 0 0 1px var(--edge)}
+.dz-amap-key div{display:flex;gap:7px;align-items:center}
+.dz-amap-key i{width:9px;height:9px;display:inline-block;font-style:normal;font-size:10px;line-height:9px;color:#f4ecdc;box-shadow:0 0 0 1px var(--ink)}
+.dz-amap-key i[data-k="you"]{box-shadow:none}.dz-amap-key i[data-k="pillar"]{background:#6dccc4;transform:rotate(45deg) scale(.8)}.dz-amap-key i[data-k="door"]{background:#e6d098}.dz-amap-key i[data-k="exit"]{background:#c9b78e}.dz-amap-key i[data-k="quest"]{background:#e0b850;transform:rotate(45deg) scale(.85)}
+.dz-amap-key small{color:var(--muted);font-size:10px;max-width:150px}
+.dz-notes{position:absolute;left:50%;transform:translateX(-50%);top:calc(10px + env(safe-area-inset-top,0px));display:grid;gap:5px;width:min(300px,calc(100% - 520px));min-width:220px;z-index:6;pointer-events:none}
+.dz-note{display:grid;grid-template-columns:30px 1fr;gap:8px;align-items:center;padding:5px 9px;font-size:12px;line-height:1.25;color:var(--text);animation:dznote .25s ease-out}
+.dz-note[data-k="info"]{grid-template-columns:1fr}.dz-note[data-k="info"] .dz-note-ic{display:none}
+.dz-note small{display:block;font-size:10px;color:var(--muted)}
+.dz-notes[data-dim="1"] .dz-note:not([data-k="info"]){display:none}
+.dz-note-ic{width:30px;height:30px;display:grid;place-items:center;background:var(--ink);box-shadow:inset 0 0 0 1px var(--edge);font-size:14px}
+.dz-note[data-k="q"]{box-shadow:inset 3px 0 0 #e0b850,inset 0 0 0 2px var(--edge),0 3px 0 var(--ink)}.dz-note[data-k="q"] .dz-note-ic{color:#e0b850}
+.dz-note[data-k="l"]{box-shadow:inset 3px 0 0 var(--ley),inset 0 0 0 2px var(--edge),0 3px 0 var(--ink)}.dz-note[data-k="l"] .dz-note-ic{color:var(--ley)}
+.dz-note[data-k="i"]{box-shadow:inset 3px 0 0 var(--ember),inset 0 0 0 2px var(--edge),0 3px 0 var(--ink)}.dz-note[data-k="i"] .dz-note-ic{color:#e0b850}
+@keyframes dznote{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+@media (max-width:760px){.dz-notes{width:min(260px,calc(100% - 340px))}}
 @keyframes dztoast{from{opacity:0;transform:translate(-50%,8px)}to{opacity:1;transform:translate(-50%,0)}}
 .dz-overlay{position:absolute;inset:0;background:rgba(20,16,28,.72);display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);place-items:center;padding:calc(10px + env(safe-area-inset-top,0px)) max(10px,env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(10px,env(safe-area-inset-left,0px));touch-action:auto;z-index:4}
 .dz-panel{width:min(820px,100%);max-height:100%;display:flex;flex-direction:column;background:var(--panel);border:2px solid var(--ink);box-shadow:inset 0 0 0 2px var(--edge),0 4px 0 var(--ink);min-height:0}
@@ -147,7 +311,7 @@ const CSS = `
 .dz-item{display:grid;grid-template-columns:1fr auto;gap:2px 12px;padding:8px 10px;background:var(--night);border:2px solid var(--edge)}
 .dz-item b{font-weight:500}
 .dz-pigrid{display:grid;grid-template-columns:1fr 1fr;gap:6px}.dz-pigrid .dz-opt{display:grid;gap:2px;text-align:left!important;padding:8px 10px!important}.dz-pigrid small{font-size:11px;color:var(--muted)}.dz-pigrid em{font-style:normal;font-size:12px;color:#8fdcd4}
-.dz-need{font-style:normal}.dz-need[data-ok="0"]{opacity:.5}.dz-gwho{display:flex;gap:6px;grid-column:1/-1}
+.dz-plabel{font-size:12px;letter-spacing:.12em;text-transform:uppercase;opacity:.75;margin:6px 0 2px}.dz-prow{grid-template-columns:44px 1fr auto;align-items:center;padding:4px 10px}.dz-item.dz-prow>.dz-pport{grid-column:1;grid-row:1}.dz-item.dz-prow>b{grid-column:2;grid-row:1}.dz-item.dz-prow>.dz-act{grid-column:3;grid-row:1;min-width:120px;width:auto;justify-self:end;padding:8px 12px;font-size:15px;letter-spacing:.06em}#dz-party{max-height:min(62vh,520px);overflow-y:auto}.dz-pport{width:40px;height:40px;overflow:hidden;display:flex;align-items:center;justify-content:center}.dz-need{font-style:normal}.dz-need[data-ok="0"]{opacity:.5}.dz-gwho{display:flex;gap:6px;grid-column:1/-1}
 .dz-study{z-index:58;background:rgba(10,8,14,.9)}.dz-stcard{display:grid;gap:8px;padding:12px 16px;justify-items:center;max-height:96vh;max-width:min(94vw,440px)}
 .dz-sthead{display:flex;gap:10px;align-items:baseline;width:100%}.dz-sthead b{font-size:20px;color:#8fdcd4;letter-spacing:.08em}.dz-sthead span{font-size:13px;color:var(--muted);flex:1}.dz-sthead em{font-style:normal;color:#8fdcd4}
 .dz-stsvg{width:min(62vh,300px);height:min(62vh,300px);background:#16121e;border:2px solid var(--edge);touch-action:none;cursor:pointer}
@@ -728,24 +892,25 @@ const CREDIT_ROWS = [
   ["Sound effects and ambience", "TomMusic · Free Fantasy SFX Pack · tommusic.itch.io"],
   ["Characters, creatures and NPCs", "craftpix.net: chibi male and female sprites, RPG heroes, warrior, knight and robot sprite sheets, peasants, village NPCs, witches, warrior girls, NPC elves, anime warriors, fantasy enemies, orcs, skeletons, slimes, golem, predator plant mobs, hunt animals, Fire Wizard, Lightning Mage and Wanderer Magician"],
   ["", "Monsters Creatures Fantasy 2 · Pixel Monster Pack · Pixel Chest Pack · Soul Hunter by Honza Shift"],
-  ["Battle backgrounds", "craftpix.net: fantasy 2D battlegrounds, free winter backgrounds, fantasy horizontal battle backgrounds"],
-  ["Tiles, effects and icons", "craftpix.net: top-down ruins, top-down trees, rocks, guild hall, paths and roads, dungeon tiles, magic sprite effects, weapon and item icons, book and bestiary art, game user interface frames and icons"],
+  ["", "Act Three: top-down skeletons, ents and golems, Tiny Monsters, cursed land tileset and objects, undead land objects"],
+  ["Battle backgrounds", "craftpix.net: fantasy 2D battlegrounds, free winter backgrounds, fantasy horizontal battle backgrounds, cave horizontal battle backgrounds"],
+  ["Tiles, effects and icons", "craftpix.net: top-down ruins, top-down trees, rocks, guild hall, paths and roads, dungeon tiles, top-down cave objects, glowing cave tileset, magic sprite effects, weapon and item icons, book and bestiary art, game user interface frames and icons"],
   ["Type", "Pixelify Sans by Stefie Justprince (SIL Open Font License)"],
   ["", "All third-party art was recoloured and grimmed for Talvora."],
 ];
 /* For the testers: thanks, and a part in the game for anyone who reaches the end of an act. */
 const TESTER_ROWS = (act) => [
   ["To our testers", "Thank you, each and every one of you. Every bug you found, every note you sent and every hour you spent wandering Talvora made this a better game."],
-  ["A part in Talvora", `You made it to the end of Act ${act === 2 ? "Two" : "One"}, and that earns you a role in the game. Be a villager, a guard, a merchant, a foe, anyone you like, under your own name or one you choose. Take a screenshot of this card and send it to Ryan with how you'd like to appear.`],
+  ["A part in Talvora", `You made it to the end of Act ${act === 3 ? "Three" : act === 2 ? "Two" : "One"}, and that earns you a role in the game. Be a villager, a guard, a merchant, a foe, anyone you like, under your own name or one you choose. Take a screenshot of this card and send it to Ryan with how you'd like to appear.`],
 ];
 function ActCredits({ onDone, act = 1 }) {
-  const rows = [["Unwoven: A Tale of Talvora", act === 2 ? "Act Two · The Frostcrown March" : "Act One · Oakhaven"], ...CREDIT_ROWS, ...TESTER_ROWS(act),
-    ...(act === 2 ? [["", "Act Three: southern Etharis."], ["", "The plains are still yours to explore until then."]] : [["", "Act Two: the east road to Ashford."]])];
+  const rows = [["Unwoven: A Tale of Talvora", act === 3 ? "Act Three · The Broken Seal" : act === 2 ? "Act Two · The Frostcrown March" : "Act One · Oakhaven"], ...CREDIT_ROWS, ...TESTER_ROWS(act),
+    ...(act === 3 ? [["", "Act Four: the road to the Capital."], ["", "The south is still yours to explore until then."]] : act === 2 ? [["", "Act Three: southern Etharis."], ["", "The plains are still yours to explore until then."]] : [["", "Act Two: the east road to Ashford."]])];
   return (
     <div className="dz-tut" role="dialog" aria-label="Act credits" style={{ zIndex: 60, background: "rgba(10,8,14,.94)", overflowY: "auto" }}>
       <style>{`@keyframes dz-crin{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}.dz-cr{animation:dz-crin 1.4s ease-out both}`}</style>
       <div style={{ textAlign: "center", maxWidth: 560, padding: 16, display: "grid", gap: 14 }}>
-        <div className="dz-cr" style={{ font: "700 clamp(18px,5vh,30px) monospace", letterSpacing: ".3em", color: "#e9d9b4" }}>{act === 2 ? "END OF ACT TWO" : "END OF ACT ONE"}</div>
+        <div className="dz-cr" style={{ font: "700 clamp(18px,5vh,30px) monospace", letterSpacing: ".3em", color: "#e9d9b4" }}>{act === 3 ? "END OF ACT THREE" : act === 2 ? "END OF ACT TWO" : "END OF ACT ONE"}</div>
         {rows.map(([a, b], i) => (
           <div key={i} className="dz-cr" id={a === "A part in Talvora" ? "dz-credits-role" : a === "To our testers" ? "dz-credits-thanks" : undefined} style={{ animationDelay: `${0.8 + i * 0.6}s`, ...(a === "To our testers" || a === "A part in Talvora" ? { border: "1px solid rgba(233,217,180,.25)", background: "rgba(233,217,180,.05)", padding: "10px 12px" } : null) }}>
             {a ? <div style={{ fontSize: 12, letterSpacing: ".22em", textTransform: "uppercase", color: "#8fa3a0" }}>{a}</div> : null}
@@ -761,7 +926,7 @@ function ActCredits({ onDone, act = 1 }) {
 export default function DurinnGame({ hot }) {
   useFontLink();
   const rootRef = useRef(null), canvasRef = useRef(null), engRef = useRef(null), GRef = useRef(null);
-  const hudRefs = { place: useRef(null), time: useRef(null), coins: useRef(null), ley: useRef(null), bar: useRef(null), fps: useRef(null) };
+  const hudRefs = { place: useRef(null), time: useRef(null), coins: useRef(null), ley: useRef(null), bar: useRef(null), fps: useRef(null), root: useRef(null) };
   const joyBase = useRef(null), joyKnob = useRef(null), joy = useRef({ id: null, bx: 0, by: 0 });
   const toastTimer = useRef(0), dlgQ = useRef(null), choiceShownAt = useRef(0);
 
@@ -795,6 +960,11 @@ export default function DurinnGame({ hot }) {
   const [spotIdx, setSpotIdx] = useState(0);
   const [dlg, setDlg] = useState(null);
   const [typed, setTyped] = useState(0);
+  const [dlgLogOpen, setDlgLogOpen] = useState(false);
+  const dlgLog = useRef([]), dlgFF = useRef(false), dlgHoldT = useRef(0);
+  const [dlgFFOn, setDlgFFOn] = useState(false);
+  const setFF = (on) => { dlgFF.current = on; setDlgFFOn(on); };
+  const dlgHold = (on) => { clearTimeout(dlgHoldT.current); if (on) dlgHoldT.current = setTimeout(() => setFF(true), 380); else if (dlgFF.current) setFF(false); };
   const [shopOpen, setShopOpen] = useState(false);   // false, or the id of the merchant whose counter is open
   const [pillarUi, setPillarUi] = useState(null);     // { id, view } while the player rests a hand on a Pillar
   const [job, setJob] = useState(null);
@@ -843,11 +1013,42 @@ export default function DurinnGame({ hot }) {
   const ui = useRef({});
   ui.current = { screen, menu, dlg, typed, shopOpen, job, fight, scene, tut, dice, pillarUi, credits };
 
-  const flashToast = useCallback((text, ms = 2200) => {
-    setToast(text);
-    clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(null), ms);
+  /* notifications: one style for everything, stacked up to three, each with an icon; the old one-line toasts are
+     notes of the "info" kind */
+  const [notes, setNotes] = useState([]);
+  const noteSeq = useRef(0);
+  const notify = useCallback((n) => {
+    const id = ++noteSeq.current, ms = n.ms || 3000;
+    setNotes((l) => [...l.filter((x) => !(n.key && x.key === n.key)), { ...n, id }].slice(-3));
+    setTimeout(() => setNotes((l) => l.filter((x) => x.id !== id)), ms);
+    if (n.k && n.k !== "info") Blip.play(n.k === "q" ? "quest" : n.k === "l" ? "level" : "item", 0.8);
   }, []);
+  const flashToast = useCallback((text, ms = 2200) => { setToast(text); notify({ k: "info", t: text, ms }); }, [notify]);
+
+  const noteSnap = useRef(null), noteQuiet = useRef(0);
+  useEffect(() => {
+    const snap = (G) => ({ G, items: { ...G.items }, coins: G.coins, q: Object.fromEntries((typeof ASH_QUESTS !== "undefined" ? ASH_QUESTS : []).map(([k]) => [k, qs(G, k)])),
+      lv: Object.fromEntries(Object.keys(G.party || {}).map((k) => [k, G.party[k].lv])) });
+    const id = setInterval(() => {
+      const G = GRef.current, u = ui.current; if (!G || u.screen !== "game") { noteSnap.current = null; return; }
+      const busy = u.fight || u.shopOpen || u.job || u.dice || u.credits || u.menu || u.pillarUi;
+      if (busy) noteQuiet.current = performance.now();
+      const prev = noteSnap.current;
+      if (!prev || prev.G !== G || busy || performance.now() - noteQuiet.current < 1200) { noteSnap.current = snap(G); return; }
+      for (const k of Object.keys(G.items)) {
+        const d = (G.items[k] || 0) - (prev.items[k] || 0); if (d <= 0 || !ITEMS[k]) continue;
+        notify({ k: "i", item: k, t: `+${d} ${ITEMS[k].name}`, s: ITEMS[k].quest ? "Quest item" : `In your pack · ${G.items[k]}`, key: "it_" + k });
+      }
+      if (G.coins - prev.coins > 0) notify({ k: "i", g: "◉", t: `+${G.coins - prev.coins} coppers`, s: `Purse · ${G.coins}`, key: "coins" });
+      if (typeof ASH_QUESTS !== "undefined") for (const [k, name, steps] of ASH_QUESTS) {
+        const a = prev.q[k] | 0, b = qs(G, k); if (b <= a) continue;
+        notify({ k: "q", g: "◆", t: b >= steps.length ? "Quest complete" : a === 0 ? "New quest" : "Quest updated", s: name, key: "q_" + k, ms: 3600 });
+      }
+      for (const k of Object.keys(G.party || {})) if ((prev.lv[k] | 0) && G.party[k].lv > prev.lv[k]) notify({ k: "l", g: "★", t: `${(k === "wren" && G.name) || (BTL_PARTY[k] && BTL_PARTY[k].name) || k} reached level ${G.party[k].lv}`, key: "lv_" + k });
+      noteSnap.current = snap(G);
+    }, 450);
+    return () => clearInterval(id);
+  }, [notify]);
 
   /* ---------- engine ---------- */
   const handlers = useRef({});
@@ -856,6 +1057,7 @@ export default function DurinnGame({ hot }) {
       hud: () => ({ place: hudRefs.place.current, time: hudRefs.time.current, coins: hudRefs.coins.current, ley: hudRefs.ley.current, bar: hudRefs.bar.current, fps: hudRefs.fps.current }),
       onPassOut: () => handlers.current.passOut && handlers.current.passOut(),
       onEnterMap: (id) => handlers.current.enterMap && handlers.current.enterMap(id),
+      onTrigger: (id) => handlers.current.trigger && handlers.current.trigger(id),
       onEncounter: (e) => handlers.current.encounter && handlers.current.encounter(e),
       onWarpBlocked: (say) => handlers.current.warpBlocked && handlers.current.warpBlocked(say),
       onMapChange: () => bump(),
@@ -919,17 +1121,30 @@ export default function DurinnGame({ hot }) {
       teleport: (x, y, dir) => eng.warp(eng.mapId(), x, y, dir, { dur: 0.5 }),
       goto: (map, x, y, dir) => eng.warp(map, x, y, dir, { dur: 0.5, after: () => { bump(); handlers.current.enterMap && handlers.current.enterMap(map); } }),
       heal: () => { btlRest(G); },
-      innRest: (swap) => { eng.fade(() => { const r = innRest(G, swap, eng.mapId().startsWith("gw") ? "gw" : eng.mapId().startsWith("fort") ? "fort" : "ash"); eng.setNight(r.night, false); eng.refreshWorld(); setTimeout(() => { const ok = saveGame(); bump(); flashToast(`${r.swapped ? (r.night ? "You sleep until nightfall." : "You sleep until morning.") : "You rest a while."} The party is mended${ok ? ", and your place is saved" : ""}.`, 3200); handlers.current.enterMap && handlers.current.enterMap(eng.mapId(), true); }, 450); }, 0.8); },
+      innRest: (swap) => { eng.fade(() => { const r = innRest(G, swap, eng.mapId().startsWith("rot") ? "rotmoor" : eng.mapId().startsWith("gw") ? "gw" : eng.mapId().startsWith("fort") ? "fort" : "ash"); eng.setNight(r.night, false); eng.refreshWorld(); setTimeout(() => { const ok = saveGame(); bump(); flashToast(`${r.swapped ? (r.night ? "You sleep until nightfall." : "You sleep until morning.") : "You rest a while."} The party is mended${ok ? ", and your place is saved" : ""}.`, 3200); handlers.current.enterMap && handlers.current.enterMap(eng.mapId(), true); }, 450); }, 0.8); },
       fireStart: () => { G.flags.d4_fire = true; G.time = NIGHT_T; eng.refreshWorld(); },
       joinParty: (id) => { btlEnsureParty(G); if (!G.partyIds.includes(id)) { G.partyIds.push(id); G.party[id] = btlFreshMember(id, G.party.wren.lv); } },
       rot: (key, lines) => { const i = G.chatter[key] || 0; G.chatter[key] = (i + 1) % lines.length; return lines[i % lines.length]; },
     };
   };
 
+  /* a context for looking ahead: scripts run against copies, and nothing they would change is changed */
+  const dryCtx = useCallback(() => {
+    const G = GRef.current, eng = engRef.current; if (!G || !eng) return null;
+    const G2 = { ...G, flags: { ...G.flags }, items: { ...G.items }, chatter: { ...(G.chatter || {}) }, party: G.party, partyIds: [...(G.partyIds || [])] };
+    const noop = () => {};
+    return { G: G2, trade: TRADES[G.trade], hour: eng.hour(), part: partOfDay(G.time), map: eng.mapId(), flag: (k) => !!G2.flags[k], set: noop, has: (k) => (G2.items[k] || 0) > 0,
+      give: noop, take: noop, coins: noop, learn: noop, setNight: noop, tile: eng.playerTile(), refreshWorld: noop, wakeWild: noop, shake: noop, teleport: noop, goto: noop, heal: noop, innRest: noop,
+      fireStart: noop, joinParty: noop, rot: (k, l) => l[0] };
+  }, []);
+  const [areaMap, setAreaMap] = useState(false);
   const afterActions = useRef({});
   const showLine = (who, text) => {
     if (NPC_DEFS[who] && engRef.current) engRef.current.faceNpc(who);
-    setDlg({ who, text: fillText(text, vars()), choices: null, sel: 0 }); setTyped(0);
+    const t2 = fillText(text, vars());
+    setDlg({ who, text: t2, choices: null, sel: 0 }); setTyped(0);
+    const nm = who && who !== "narrator" ? ((NPC_DEFS[who] && NPC_DEFS[who].name) || (who === "player" ? (GRef.current && GRef.current.name) : null) || (BTL_PARTY[who] && BTL_PARTY[who].name) || null) : null;
+    dlgLog.current.push({ who: nm, t: t2 }); if (dlgLog.current.length > 60) dlgLog.current.shift();
   };
   const advance = () => {
     const q = dlgQ.current;
@@ -1068,6 +1283,7 @@ export default function DurinnGame({ hot }) {
   };
   afterActions.current.credits = () => setCredits(true);
   afterActions.current.credits2 = () => setCredits(2);
+  afterActions.current.credits3 = () => setCredits(3);
   /* Act Two: the world opens. The Pillar becomes a place to rest, and the hours pass only there. */
   const beginAct2 = () => {
     const G = GRef.current, eng = engRef.current; setCredits(false);
@@ -1083,10 +1299,10 @@ export default function DurinnGame({ hot }) {
     act2Ensure(G);
     if (!G.pillars[id]) {   // a sleeping Pillar wakes at the first touch
       G.pillars[id] = true; eng.burst(); saveGame();
-      runScript([{ who: "narrator", t: "The stone is cold, and then it is not. A hum climbs out of the ground and settles in your teeth. This Pillar is awake." }, { do: () => setPillarUi({ id, view: "main" }) }], "narrator");
+      runScript([{ who: "narrator", t: "The stone is cold, and then it is not. A hum climbs out of the ground and settles in your teeth. This Pillar is awake." }, { do: () => setPillarUi({ id, view: GRef.current && GRef.current.flags.swap_tut && !GRef.current.flags.swap_tut_done ? "party" : "main" }) }], "narrator");
       return;
     }
-    setPillarUi({ id, view: "main" });
+    setPillarUi({ id, view: G && G.flags.swap_tut && !G.flags.swap_tut_done ? "party" : "main" });
   };
   const restAtPillar = (swap) => {
     const G = GRef.current, eng = engRef.current, pu = ui.current.pillarUi; if (!G || !eng || !pu) return;
@@ -1120,6 +1336,7 @@ export default function DurinnGame({ hot }) {
     });
   };
   handlers.current.passOut = () => wakeUp(true);
+  handlers.current.trigger = (id) => { const f = SCRIPTS["trig_" + id]; if (!f || dlgQ.current || !GRef.current) return; const st = f(scriptCtx()); if (st && st.length) runScript(st, "narrator"); };
   handlers.current.warpBlocked = (say) => { if (!dlgQ.current) runScript([{ who: "narrator", t: say || "Not like this. The mirror by the fireplace first." }], "narrator"); };
   handlers.current.enterMap = (id, quiet) => {
     const G = GRef.current, eng = engRef.current;
@@ -1153,7 +1370,7 @@ export default function DurinnGame({ hot }) {
   /* ---------- battles ---------- */
   const partyFor = (G) => {
     btlEnsureParty(G);
-    return G.partyIds.map((id) => ({ key: id, lv: G.party[id].lv, hp: G.party[id].hp, mp: G.party[id].mp, eq: G.equip && G.equip[id], look: id === "wren" ? G.look : undefined, name: id === "wren" ? G.name : undefined }));
+    return G.partyIds.map((id) => ({ key: id, lv: G.party[id].lv, hp: G.party[id].hp, mp: G.party[id].mp, eq: G.equip && G.equip[id], look: id === "wren" ? G.look : typeof COMP_LOOK !== "undefined" && COMP_LOOK[id] ? COMP_LOOK[id] : undefined, name: id === "wren" ? G.name : undefined }));
   };
   handlers.current.encounter = (e) => {
     const G = GRef.current; if (!G) return;
@@ -1273,7 +1490,8 @@ export default function DurinnGame({ hot }) {
     setCastMenu(false);
     if (me.mp < sp.cost) { flashToast("Out of breath. Wait a moment, or rest.", 2000); return; }
     me.mp -= sp.cost; G.sigs = (G.sigs || 0) + 1;
-    eng.burst(); flashToast(eng.castMap(sp.mapUse), 2600); bump();
+    const sc = typeof scrutinyOnCast === "function" ? scrutinyOnCast(G, eng.mapId(), eng.playerTile()) : null;
+    eng.burst(); flashToast(eng.castMap(sp.mapUse) + (sc ? " " + sc : ""), 2600); bump();
   };
 
   /* ---------- screens ---------- */
@@ -1311,10 +1529,20 @@ export default function DurinnGame({ hot }) {
   /* ---------- typewriter ---------- */
   useEffect(() => {
     if (!dlg || dlg.choices) return;
-    if (typed >= dlg.text.length) return;
-    const id = setTimeout(() => setTyped((n) => Math.min(dlg.text.length, n + 2)), 22);
+    if (typed >= dlg.text.length) {
+      const auto = settings.autoDlg && settings.autoDlg !== "off";
+      if (!dlgFF.current && !auto) return;
+      const wait = dlgFF.current ? 110 : (settings.autoDlg === "fast" ? 650 + dlg.text.length * 16 : 1300 + dlg.text.length * 34);
+      const id = setTimeout(() => { const u = ui.current; if (u.dlg === dlg && !u.menu && !dlgLogOpen) advance(); }, wait);
+      return () => clearTimeout(id);
+    }
+    const step = dlgFF.current ? 8 : ({ 1: 1, 2: 2, 3: 4 }[settings.textSpeed || 2] || 2);
+    const id = setTimeout(() => {
+      setTyped((n) => Math.min(dlg.text.length, n + step));
+      if (!dlgFF.current && typed % 4 < step && /\S/.test(dlg.text[typed] || "")) Blip.play("text", dlg.who === "narrator" ? 0.45 : 0.8);
+    }, 22);
     return () => clearTimeout(id);
-  }, [dlg, typed]);
+  }, [dlg, typed, settings.autoDlg, settings.textSpeed, dlgLogOpen, dlgFFOn]);
 
   /* ---------- keyboard ---------- */
   useEffect(() => {
@@ -1334,14 +1562,14 @@ export default function DurinnGame({ hot }) {
         return;
       }
       if (move.has(k)) { eng.input.keys.add(k); e.preventDefault(); return; }
-      if (e.repeat) return;
+      if (e.repeat) { if ((k === "e" || k === " " || k === "Enter") && u.dlg && !u.dlg.choices) { if (!dlgFF.current) setFF(true); } return; }
       if (k === "e" || k === " " || k === "Enter") { e.preventDefault(); pressA(); }
       else if (k === "q" || k === "x") pressB();
       else if (k === "Escape" && !u.dlg && !u.scene && !u.tut && !u.dice) setMenu("settings");
       else if (k === "i" && !u.dlg && !u.scene && !u.tut && !u.dice) setMenu("pack");
       else if ((k === "b" || k === "m") && !u.dlg && !u.scene && !u.tut && !u.dice) setMenu(k === "m" ? "book:map" : "book");
     };
-    const up = (e) => { const eng = engRef.current; if (eng) eng.input.keys.delete(norm(e.key)); };
+    const up = (e) => { const eng = engRef.current; if (eng) eng.input.keys.delete(norm(e.key)); if (["e", " ", "Enter"].includes(norm(e.key)) && dlgFF.current) setFF(false); };
     const blur = () => { const eng = engRef.current; if (eng) eng.input.keys.clear(); };
     window.addEventListener("keydown", down); window.addEventListener("keyup", up); window.addEventListener("blur", blur);
     return () => { window.removeEventListener("keydown", down); window.removeEventListener("keyup", up); window.removeEventListener("blur", blur); };
@@ -1354,10 +1582,12 @@ export default function DurinnGame({ hot }) {
   }, []);
 
   /* ---------- joystick ---------- */
-  const R = 44;
+  const CTL_K = { S: 0.85, M: 1, L: 1.2, XL: 1.4 }, ctlK = CTL_K[settings.ctlSize || "L"] || 1.2, lefty = !!settings.lefty;
+  const R = 44 * ctlK;
   const placeBase = (x, y, active) => { const b = joyBase.current; if (!b) return; b.style.left = x + "px"; b.style.top = y + "px"; b.dataset.active = active ? "1" : "0"; };
   const resetKnob = () => { if (joyKnob.current) joyKnob.current.style.transform = "translate(0px,0px)"; };
-  const restBase = () => { const r = rootRef.current.getBoundingClientRect(); placeBase(94, r.height - 96, false); };
+  const restAt = () => { const r = rootRef.current.getBoundingClientRect(), k = ctlK; return [lefty ? r.width - 94 * k : 94 * k, r.height - 96 * k]; };
+  const restBase = () => { const [x, y] = restAt(); placeBase(x, y, false); };
   const controlsOn = screen === "game" && !menu && !shopOpen && !job;
   const packBtn = <button className="dz-btn dz-btn-pack" id="dz-pack" aria-label="Open your pack" onPointerDown={(e) => e.stopPropagation()} onClick={() => setMenu("pack")}><div><span>Pack</span></div></button>;
   const bookBtn = <button className="dz-btn dz-btn-book" id="dz-book" aria-label="Open the book" onPointerDown={(e) => e.stopPropagation()} onClick={() => setMenu("book")}><div><span>Book</span></div></button>;
@@ -1373,10 +1603,13 @@ export default function DurinnGame({ hot }) {
     const r = rootRef.current.getBoundingClientRect();
     const x = e.clientX - r.left, y = e.clientY - r.top;
     if (ui.current.dlg) { if (!ui.current.dlg.choices) pressA(); return; }
-    if (x > r.width * 0.55) return;
-    joy.current = { id: e.pointerId, bx: x, by: y };
+    if (lefty ? x < r.width * 0.45 : x > r.width * 0.55) return;
+    let bx = x, by = y;
+    if (settings.joyFixed) { const [rx, ry] = restAt(); if (Math.hypot(x - rx, y - ry) > 110 * ctlK) return; bx = rx; by = ry; }   // a fixed stick stays put: grab it where it sits
+    joy.current = { id: e.pointerId, bx, by };
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
-    placeBase(x, y, true); resetKnob();
+    placeBase(bx, by, true); resetKnob();
+    if (settings.joyFixed) onCtlMove(e);
   };
   const onCtlMove = (e) => {
     if (e.pointerId !== joy.current.id) return;
@@ -1429,7 +1662,7 @@ export default function DurinnGame({ hot }) {
   useEffect(() => { Sfx.volume(settings.sfx === undefined ? 0.6 : settings.sfx); }, [settings.sfx]);
   /* ambience, doors and gates, and footsteps */
   useEffect(() => {
-    let lastMap = null, lastX = 0, lastY = 0, stepT = 0, stepN = 0;
+    let lastMap = null, lastX = 0, lastY = 0, stepT = 0, stepN = 0, walkT = 0;
     const id = setInterval(() => {
       const e = engRef.current, G = GRef.current;
       if (!e || screen !== "game" || !G) { Sfx.amb(null); return; }
@@ -1443,10 +1676,12 @@ export default function DurinnGame({ hot }) {
         else if (def && was && def.outside && !was.outside) Sfx.play("doorclose", 0.6);
       }
       lastMap = mid;
+      if (!fight && !AWAY.on) G.playMs = (G.playMs || 0) + 110;
       let st = null; try { st = e.debugState(); } catch (err) { /* engine busy */ }
       if (st && st.player && !fight && !dlg) {
         const p = st.player, moved = Math.hypot(p.x - lastX, p.y - lastY);
         lastX = p.x; lastY = p.y; stepT += 0.11;
+        { const hr = hudRefs.root.current; if (hr) { if (moved > 0.5) walkT = performance.now(); const wv = performance.now() - walkT < 700 ? "1" : "0"; if (hr.dataset.walk !== wv) hr.dataset.walk = wv; } }
         if (moved > 0.5 && moved < 12 && stepT > 0.3) {
           stepT = 0; stepN = (stepN + 1) % 3;
           const t = e.playerTile();
@@ -1470,29 +1705,34 @@ export default function DurinnGame({ hot }) {
       <canvas className="dz-canvas" ref={canvasRef} aria-label="Oakhaven" />
 
       {screen === "game" ? (
-        <div className="dz-hud">
-          <div className="hd-panel">
-            <div className="hd-top" />
-            <div className="hd-sec dz-hudbox">
-              <div className="dz-zone" ref={hudRefs.place}>Oakhaven</div>
-              <div className="dz-time"><span className="hd-row"><i className="hd-ico hd-sun" aria-hidden="true" /><span ref={hudRefs.time}>Day 1</span></span><b className="hd-row"><i className="hd-ico hd-coin" aria-hidden="true" /><span ref={hudRefs.coins}>0 coppers</span></b></div>
-              {magicOn ? <div className="dz-ley hd-row"><i className="hd-ico hd-ley" aria-hidden="true" /><span ref={hudRefs.ley}>Calm</span></div> : null}
-              {magicOn ? <div className="dz-bar hd-bar"><i ref={hudRefs.bar} /></div> : null}
-            </div>
-            {curTask && !dlg && !menu ? (
-              <>
-                <div className="hd-div" />
-                <div className="hd-sec dz-task"><span className="hd-row hd-tasklbl"><i className="hd-ico hd-task" aria-hidden="true" />Task</span>{curTask.text}{curTask.hint ? <small>{curTask.hint}</small> : null}</div>
-              </>
+        <div className="dz-hud nh" ref={hudRefs.root} data-walk="0">
+          <div className="nh-card dz-frame">
+            <div className="dz-zone" ref={hudRefs.place}>Oakhaven</div>
+            <div className="dz-time"><span className="hd-row"><i className="hd-ico hd-sun" aria-hidden="true" /><span ref={hudRefs.time}>Day 1</span></span><b className="hd-row"><i className="hd-ico hd-coin" aria-hidden="true" /><span ref={hudRefs.coins}>0</span></b></div>
+            {magicOn ? <div className="nh-meter" title="The Ley: calm under a Pillar, wild away from one"><i className="nh-dia" aria-hidden="true" /><div className="dz-bar nh-bar"><i ref={hudRefs.bar} /></div><span ref={hudRefs.ley}>Calm</span></div> : null}
+            {magicOn && G && G.flags.act2_end && (G.flags.scrutiny | 0) > 0 ? (
+              <div className="nh-meter nh-scr" id="dz-scrutiny" title="Scrutiny: how much the Covenant has noticed you weaving"><i className="nh-dia" data-k="scr" aria-hidden="true" /><div className="dz-bar nh-bar"><i style={{ width: `${G.flags.scrutiny | 0}%` }} /></div><span style={{ color: (G.flags.scrutiny | 0) >= 50 ? "#d88a7a" : undefined }}>{(G.flags.scrutiny | 0) >= 100 ? "Hunted" : (G.flags.scrutiny | 0) >= 50 ? "Watched" : "Noticed"}</span></div>
             ) : null}
-            <div className="hd-bot" />
+            {G && G.flags.act2 && G.partyIds && G.partyIds.length ? (
+              <div className="nh-pips" style={{ "--n": G.partyIds.length }}>
+                {G.partyIds.map((id) => {
+                  const m = G.party && G.party[id]; if (!m) return null;
+                  const mx = btlStatsFor(G, id, m.lv).hp, k = Math.max(0, Math.min(1, m.hp / Math.max(1, mx)));
+                  const look = id === "wren" ? G.look : typeof COMP_LOOK !== "undefined" && COMP_LOOK[id] ? COMP_LOOK[id] : { chibi: id === "companion" ? "companion" : (CHIBI_MAP[id] || id) };
+                  return <div className="nh-pip" key={id} title={`${(id === "wren" && G.name) || (BTL_PARTY[id] && BTL_PARTY[id].name) || id}: ${m.hp}/${mx}`}>
+                    <div className="nh-face"><PixelImage source={getPortrait(look)} scale={0.38} /></div>
+                    <div className="nh-hp"><i style={{ width: `${Math.round(k * 100)}%` }} data-low={k < 0.25 ? "2" : k < 0.5 ? "1" : "0"} /></div></div>;
+                })}
+              </div>
+            ) : null}
           </div>
+          {curTask && !dlg && !menu ? <div className="nh-task dz-task dz-frame">{curTask.text}{curTask.hint ? <small>{curTask.hint}</small> : null}</div> : null}
         </div>
       ) : null}
 
       {screen === "game" && controlsOn ? (
         showTouch ? (
-          <div className="dz-ctl" onPointerDown={onCtlDown} onPointerMove={onCtlMove} onPointerUp={onCtlUp} onPointerCancel={onCtlUp}>
+          <div className="dz-ctl" data-lefty={lefty ? "1" : "0"} data-row={ctlK >= 1.4 ? "1" : "0"} style={{ "--ck": ctlK }} onPointerDown={onCtlDown} onPointerMove={onCtlMove} onPointerUp={onCtlUp} onPointerCancel={onCtlUp}>
             <div className="dz-joy-base" ref={joyBase}><div className="dz-joy-knob" ref={joyKnob} /></div>
             <button className="dz-btn dz-btn-a" data-down={pressed.a ? "1" : "0"} data-off={!dlg && !actTarget ? "1" : "0"} aria-label={actLabel}
               onPointerDown={btnDown("a", pressA)} onPointerUp={btnUp("a")} onPointerCancel={btnUp("a")} onPointerLeave={btnUp("a")}>
@@ -1507,7 +1747,7 @@ export default function DurinnGame({ hot }) {
             ) : null}
           </div>
         ) : (
-          <div className="dz-ctl" onPointerDown={() => { if (ui.current.dlg && !ui.current.dlg.choices) pressA(); }}>
+          <div className="dz-ctl" data-lefty={lefty ? "1" : "0"} data-row={ctlK >= 1.4 ? "1" : "0"} style={{ "--ck": ctlK }} onPointerDown={() => { if (ui.current.dlg && !ui.current.dlg.choices) pressA(); }}>
             {!dlg ? <div className="dz-hint dz-frame">Arrows or WASD to move · E to talk{magicOn ? " · Q to cast" : ""} · I for Pack · B for Book · Esc for menu</div> : null}
             {!dlg ? <>{bookBtn}{packBtn}</> : null}
           </div>
@@ -1519,28 +1759,57 @@ export default function DurinnGame({ hot }) {
           <i aria-hidden="true">{isNightT(G.time) ? "☀" : "☾"}</i>{isNightT(G.time) ? "Day" : "Night"}
         </button>
       ) : null}
+      {screen === "game" && eng && G && !job && !fight && !credits ? (
+        <MiniMap eng={eng} G={G} task={curTask} dryCtx={dryCtx} hidden={!!(dlg || menu || shopOpen || dice || tut)} onOpen={() => setAreaMap(true)} />
+      ) : null}
+      {areaMap && screen === "game" && eng && G ? <AreaMap eng={eng} G={G} task={curTask} dryCtx={dryCtx} onClose={() => setAreaMap(false)} /> : null}
       {screen === "game" && !job ? (
         <button className="dz-menu-btn" id="dz-menu" aria-label="Open menu" onPointerDown={(e) => e.stopPropagation()} onClick={() => setMenu(menu ? null : "settings")}>≡</button>
       ) : null}
       <div className="dz-fps" ref={hudRefs.fps} />
-      {toast ? <div className="dz-toast" role="status" key={toast}>{toast}</div> : null}
+      {notes.length ? (
+        <div className="dz-notes" aria-live="polite" data-dim={menu || areaMap || pillarUi ? "1" : "0"}>
+          {notes.map((n) => (
+            <div key={n.id} className="dz-toast dz-note dz-frame" data-k={n.k || "info"} role="status">
+              <div className="dz-note-ic" aria-hidden="true">{n.item ? <ItemIcon id={n.item} size={24} /> : <span>{n.g || "•"}</span>}</div>
+              <div className="dz-note-t">{n.t}{n.s ? <small>{n.s}</small> : null}</div>
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       {dlg ? (
-        <div className="dz-dialog dz-frame" role="dialog" aria-label={sp ? sp.name : "Narration"} onPointerDown={(e) => { e.stopPropagation(); if (!dlg.choices) pressA(); }}>
-          {sp ? <div className="dz-portrait"><PixelImage source={getPortrait(sp.look)} scale={1.33} /></div> : null}
+        <div className="dz-dialog dz-frame nd" data-port={sp ? "1" : "0"} role="dialog" aria-label={sp ? sp.name : "Narration"}
+          onPointerDown={(e) => { e.stopPropagation(); if (!dlg.choices) pressA(); dlgHold(true); }} onPointerUp={() => dlgHold(false)} onPointerCancel={() => dlgHold(false)} onPointerLeave={() => dlgHold(false)}>
+          {sp ? <div className="dz-portrait nd-port"><PixelImage source={getPortrait(sp.look)} scale={1.9} /></div> : null}
+          {sp ? <div className="dz-name nd-plate">{sp.name}{sp.title ? <small>{sp.title}</small> : null}</div> : null}
           <div className="dz-dbody">
-            {sp ? <div className="dz-name">{sp.name}{sp.title ? <small>{sp.title}</small> : null}</div> : null}
             {dlg.text ? (
               <div className="dz-text" data-narr={sp ? "0" : "1"}>{shownText}{lineDone && !dlg.choices ? <span className="dz-more" aria-hidden="true">▼</span> : null}</div>
             ) : null}
             {dlg.choices ? (
-              <div className="dz-choices">
+              <div className="dz-choices nd-tabs">
                 {dlg.choices.map((c, i) => (
                   <button key={i} id={`dz-choice-${i}`} className="dz-choice" data-sel={dlg.sel === i ? "1" : "0"}
-                    onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); if (performance.now() - choiceShownAt.current < 400) return; choose(i); }}>{c.label}</button>
+                    onPointerDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); if (performance.now() - choiceShownAt.current < 400) return; choose(i); }}><b>{["I", "II", "III", "IV", "V", "VI"][i] || i + 1}</b>{c.label}</button>
                 ))}
               </div>
             ) : null}
+          </div>
+          <div className="nd-ctl" onPointerDown={(e) => e.stopPropagation()}>
+            <span className="nd-skip">▶▶ hold to skip</span>
+            <button id="dz-dlg-auto" data-on={settings.autoDlg && settings.autoDlg !== "off" ? "1" : "0"} onClick={(e) => { e.stopPropagation(); setSettings((st) => ({ ...st, autoDlg: st.autoDlg && st.autoDlg !== "off" ? "off" : (st.autoLast || "slow") })); }}>Auto</button>
+            <button id="dz-dlg-log" onClick={(e) => { e.stopPropagation(); setDlgLogOpen(true); }}>Log</button>
+          </div>
+        </div>
+      ) : null}
+      {dlgLogOpen ? (
+        <div className="dz-overlay" id="dz-dlglog" onPointerDown={(e) => { e.stopPropagation(); if (e.target === e.currentTarget) setDlgLogOpen(false); }}>
+          <div className="dz-panel nd-log" role="dialog" aria-label="Conversation log">
+            <div className="dz-phead"><div className="dz-ptitle">What was said</div><button className="dz-close" id="dz-dlglog-close" onClick={() => setDlgLogOpen(false)}>Close</button></div>
+            <div className="dz-pbody nd-logbody" ref={(el) => { if (el) el.scrollTop = el.scrollHeight; }}>
+              {dlgLog.current.length ? dlgLog.current.map((l, i) => <p key={i} data-narr={l.who ? "0" : "1"}>{l.who ? <b>{l.who}</b> : null}{l.t}</p>) : <p>Nothing yet.</p>}
+            </div>
           </div>
         </div>
       ) : null}
@@ -1561,7 +1830,8 @@ export default function DurinnGame({ hot }) {
       {screen === "splash" ? <Splash onDone={() => setScreen("title")} /> : null}
 
       {screen === "title" ? (
-        <div className="dz-title">
+        <div className="dz-title nt">
+          <div className="nt-embers" aria-hidden="true">{[...Array(14)].map((_, i) => <i key={i} style={{ left: `${30 + ((i * 37) % 68)}%`, animationDelay: `${(i * 0.83) % 7}s`, animationDuration: `${6 + (i % 5)}s` }} />)}</div>
           <div className="dz-tcard dz-frame">
             <h1 className="dz-logo">UNWOVEN</h1>
             <div className="dz-sub">A Tale of Talvora</div>
@@ -1581,8 +1851,19 @@ export default function DurinnGame({ hot }) {
               <div className="dz-tbtns">
                 {saveInfo ? (
                   <>
+                    {(() => {
+                      const f = saveInfo.flags || {}, act = f.act2_end ? "Act III" : f.act2 ? "Act II" : "Act I", def = MAP_DEFS[saveInfo.map];
+                      const where = def ? String(def.name || saveInfo.map).replace(/\{\w+\}/g, "").replace(/^Southern Etharis: /, "") : "";
+                      const ms = saveInfo.playMs || 0, hrs = Math.floor(ms / 3600000), mins = Math.floor((ms % 3600000) / 60000);
+                      return <div className="nt-slot">
+                        <div className="nt-face"><PixelImage source={getPortrait(saveInfo.look || {})} scale={0.95} /></div>
+                        <div className="nt-info"><b>{saveInfo.name} {PLAYER_SURNAME}</b><span>{where}</span><small>{act} · Day {saveInfo.day} · {formatClock(saveInfo.time)}{ms > 60000 ? ` · ${hrs ? hrs + "h " : ""}${mins}m played` : ""}</small>
+                          {(saveInfo.partyIds || []).length > 1 ? <div className="nt-party">{saveInfo.partyIds.filter((id) => id !== "wren").map((id) => <span key={id}><PixelImage source={getPortrait(partyLook(saveInfo, id))} scale={0.36} /></span>)}</div> : null}
+                        </div>
+                      </div>;
+                    })()}
                     <button className="dz-act" id="dz-title-continue" onClick={continueGame}>Continue</button>
-                    <div className="dz-tsave">{saveInfo.name} {PLAYER_SURNAME} · Day {saveInfo.day} · {formatClock(saveInfo.time)}</div>
+                    <div className="dz-tsave" style={{ display: "none" }}>{saveInfo.name} {PLAYER_SURNAME} · Day {saveInfo.day} · {formatClock(saveInfo.time)}</div>
                   </>
                 ) : null}
                 <button className="dz-opt" id="dz-title-battle" onClick={startPractice}>Practice battle</button>
@@ -1590,7 +1871,7 @@ export default function DurinnGame({ hot }) {
                 {canInstall ? <button className="dz-opt dz-install" id="dz-title-install" onClick={doInstall}>Install <b>Unwoven</b> as an app</button> : null}
               </div>
             )}
-            <div className="dz-tfoot">Act Two · Phase 4 playtest build</div>
+            <div className="dz-tfoot">Act Three · playtest build V93</div>
           </div>
         </div>
       ) : null}
@@ -1600,7 +1881,7 @@ export default function DurinnGame({ hot }) {
       {screen === "intro1" ? <IntroSlides part={1} eng={engRef.current} canSkip={introSeen()} onDone={() => setScreen("create")} /> : null}
       {screen === "create" ? <Creator onBack={() => setScreen("title")} onDone={(spec) => { setPending(spec); setScreen("intro2"); }} /> : null}
       {screen === "intro2" && pending ? <IntroSlides part={2} eng={engRef.current} trade={pending.trade} look={pending.look} canSkip={introSeen()} onDone={() => { markIntroSeen(); const sp = pending; setPending(null); beginNew(sp); }} /> : null}
-      {credits ? <ActCredits act={credits === 2 ? 2 : 1} onDone={credits === 2 ? () => { setCredits(false); saveGame(); bump(); } : beginAct2} /> : null}
+      {credits ? <ActCredits act={credits === 2 || credits === 3 ? credits : 1} onDone={credits === 2 || credits === 3 ? () => { setCredits(false); saveGame(); bump(); } : beginAct2} /> : null}
       {mirror && G ? <Wardrobe look={G.look} first={mirror.first} onCancel={() => setMirror(null)} onDone={(lk) => { G.look = { ...G.look, ...lk }; if (!G.flags.wardrobe_done) { G.flags.wardrobe_done = true; runScript([{ who: "narrator", t: "That will do. Time to see what the day wants." }], "narrator"); } setMirror(null); saveGame(); bump(); }} /> : null}
 
       {shopOpen && G && SHOPS[shopOpen] ? (() => {
@@ -1674,6 +1955,25 @@ export default function DurinnGame({ hot }) {
                   )}
                   <button className="dz-opt" id="dz-pillar-back" onClick={() => setPillarUi({ ...pillarUi, view: "main" })}>Back</button>
                 </div>
+              ) : pillarUi.view === "party" ? (
+                <div className="dz-pilist" id="dz-party">
+                  <p className="dz-pinote">{G.flags.swap_tut && !G.flags.swap_tut_done ? "Three may walk the road together: you, and two beside you. The others wait at the Pillars, and come when called. Choose who walks with you." : "Who walks with you, and who waits."}</p>
+                  {(() => { btlEnsureParty(G); const R = partyReserve(G), act = G.partyIds.filter((k) => k !== "wren"), full = G.partyIds.length >= PARTY_MAX;
+                    const row = (id, on) => { const m = G.party[id]; return (
+                      <div className="dz-item dz-prow" key={id}>
+                        <span className="dz-pport"><PixelImage source={getPortrait(partyLook(G, id))} scale={0.5} /></span>
+                        <b>{partyName(G, id)}<span style={{ marginLeft: 8 }}>Lv {m.lv}{btlCaster(id) ? " · caster" : ""}</span></b>
+                        <button className="dz-act" id={`dz-party-${on ? "bench" : "call"}-${id}`} disabled={!on && full} onClick={() => { if (on ? partyBench(G, id) : partyCall(G, id)) { G.flags.swap_tut_done = true; bump(); engRef.current && engRef.current.resetFollowers && engRef.current.resetFollowers(); flashToast(on ? `${partyName(G, id)} will wait here.` : `${partyName(G, id)} walks with you.`, 2000); } }}>{on ? "Wait here" : "Walk with me"}</button>
+                      </div>); };
+                    return (<>
+                      <div className="dz-plabel">Walking with you</div>
+                      {act.length ? act.map((id) => row(id, true)) : <p className="dz-pinote dz-pismall">Nobody. You walk alone.</p>}
+                      <div className="dz-plabel">Waiting</div>
+                      {R.length ? R.map((id) => row(id, false)) : <p className="dz-pinote dz-pismall">Nobody is waiting.</p>}
+                      {full && R.length ? <p className="dz-pinote dz-pismall">The road holds three. Ask someone to wait before you call another.</p> : null}
+                    </>); })()}
+                  <button className="dz-opt" id="dz-pillar-back" onClick={() => { G.flags.swap_tut_done = G.flags.swap_tut_done || !!G.flags.swap_tut; setPillarUi({ ...pillarUi, view: "main" }); }}>Back</button>
+                </div>
               ) : pillarUi.view === "craft" ? (
                 <div className="dz-pilist">
                   <p className="dz-pinote dz-pismall">The Pillar's warmth is bench enough. What you make is for using; it will never sell for more than what went into it.</p>
@@ -1694,6 +1994,7 @@ export default function DurinnGame({ hot }) {
                   <button className="dz-act" id="dz-pillar-swap" onClick={() => restAtPillar(true)}>{night ? "Rest until daybreak" : "Rest until nightfall"}</button>
                   <button className="dz-opt" id="dz-pillar-rest" onClick={() => restAtPillar(false)}>Rest a while{night ? " (stay in the night)" : " (stay in the day)"}</button>
                   {G.flags.magic ? <button className="dz-opt" id="dz-pillar-study" onClick={() => setPillarUi({ ...pillarUi, view: "study" })}>Study the tome</button> : null}
+                  {G.flags.comp_joined || (G.reserve && G.reserve.length) ? <button className="dz-opt" id="dz-pillar-party" onClick={() => setPillarUi({ ...pillarUi, view: "party" })}>Party · who walks with you</button> : null}
                   <button className="dz-opt" id="dz-pillar-craft" onClick={() => setPillarUi({ ...pillarUi, view: "craft" })}>Craft</button>
                   {G.flags.memit ? <button className="dz-opt" id="dz-pillar-travel" onClick={() => setPillarUi({ ...pillarUi, view: "travel" })}>Travel · Mem-it</button> : null}
                   <p className="dz-pinote dz-pismall">Resting mends the party, saves your place, and marks where you wake if you fall. Ordinary beasts return to the wild when you rest; the ones with names stay down.</p>
@@ -1744,14 +2045,28 @@ export default function DurinnGame({ hot }) {
       ) : null}
       {menu && G && menu !== "pack" && menu !== "items" && !BOOK_MENU(menu) ? (
         <div className="dz-overlay" onPointerDown={(e) => { if (e.target === e.currentTarget) setMenu(null); }}>
-          <div className="dz-panel" role="dialog" aria-label="Menu">
-            <div className="dz-phead">
-              <div className="dz-ptitle">{PACK_TABS.includes(menu) ? "Pack" : "Menu"} · {G.name} {PLAYER_SURNAME}</div>
-              <div role="tablist" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                {(PACK_TABS.includes(menu) ? [["gear", "Gear"], ["pack", "Pack"], ["self", "Character"]] : [["settings", "Settings"], ...(magicOn ? [["guide", "How magic works"]] : []), ...(devOk ? [["art", "Art"]] : [])]).map(([id, label]) => (
-                  <button key={id} id={`dz-tab-${id}`} role="tab" className="dz-tab" aria-selected={menu === id} onClick={() => { setMenu(id); setConfirm(null); }}>{label}</button>
+          <div className={"dz-panel" + (PACK_TABS.includes(menu) ? "" : " pm")} role="dialog" aria-label="Menu">
+            {!PACK_TABS.includes(menu) ? (
+              <div className="dz-prail" role="tablist" aria-label="Menu">
+                <button className="dz-ptab" id="dz-rail-resume" onClick={() => setMenu(null)}>Resume</button>
+                {G.flags.act2 ? <button className="dz-ptab" id="dz-rail-party" onClick={() => setMenu("gear")}>Party</button> : null}
+                <button className="dz-ptab" id="dz-rail-journal" onClick={() => setMenu(G.flags.act2 ? "book:quests" : "tasks")}>Journal</button>
+                <button className="dz-ptab" id="dz-rail-map" onClick={() => { setMenu(null); setAreaMap(true); }}>Map</button>
+                {[["settings", "Settings"], ...(magicOn ? [["guide", "How magic works"]] : []), ...(devOk ? [["art", "Art"]] : [])].map(([id, label]) => (
+                  <button key={id} id={`dz-tab-${id}`} role="tab" className="dz-ptab dz-tab" aria-selected={menu === id} onClick={() => { setMenu(id); setConfirm(null); }}>{label}</button>
                 ))}
+                <button className="dz-ptab" id="dz-rail-quit" onClick={quitToTitle}>Save &amp; quit</button>
               </div>
+            ) : null}
+            <div className="dz-phead">
+              <div className="dz-ptitle">{PACK_TABS.includes(menu) ? "Pack" : { settings: "Settings", guide: "How magic works", art: "Art" }[menu] || "Menu"} · {G.name} {PLAYER_SURNAME}</div>
+              {PACK_TABS.includes(menu) ? (
+                <div role="tablist" style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {[["gear", "Gear"], ["pack", "Pack"], ["self", "Character"]].map(([id, label]) => (
+                    <button key={id} id={`dz-tab-${id}`} role="tab" className="dz-tab" aria-selected={menu === id} onClick={() => { setMenu(id); setConfirm(null); }}>{label}</button>
+                  ))}
+                </div>
+              ) : null}
               <button className="dz-close" id="dz-close" onClick={() => setMenu(null)}>Resume</button>
             </div>
             <div className="dz-pbody">
@@ -1926,6 +2241,21 @@ export default function DurinnGame({ hot }) {
                         <button key={id} id={`dz-touch-${id}`} className="dz-opt" aria-pressed={settings.touch === id} onClick={() => setSettings((s) => ({ ...s, touch: id }))}>{label}</button>
                       ))}
                     </div>
+                    <div className="dz-srow"><span>Size</span><div className="dz-opts">{["S", "M", "L", "XL"].map((k) => <button key={k} id={`dz-ctlsize-${k}`} className="dz-opt" aria-pressed={(settings.ctlSize || "L") === k} onClick={() => setSettings((s) => ({ ...s, ctlSize: k }))}>{k}</button>)}</div></div>
+                    <div className="dz-srow"><span>Hand</span><div className="dz-opts">
+                      <button id="dz-lefty-off" className="dz-opt" aria-pressed={!settings.lefty} onClick={() => setSettings((s) => ({ ...s, lefty: false }))}>Right-handed</button>
+                      <button id="dz-lefty-on" className="dz-opt" aria-pressed={!!settings.lefty} onClick={() => setSettings((s) => ({ ...s, lefty: true }))}>Left-handed</button></div></div>
+                    <div className="dz-srow"><span>Stick</span><div className="dz-opts">
+                      <button id="dz-joy-float" className="dz-opt" aria-pressed={!settings.joyFixed} onClick={() => setSettings((s) => ({ ...s, joyFixed: false }))}>Floating</button>
+                      <button id="dz-joy-fixed" className="dz-opt" aria-pressed={!!settings.joyFixed} onClick={() => setSettings((s) => ({ ...s, joyFixed: true }))}>Fixed</button></div></div>
+                    <div className="dz-ctlprev" data-lefty={settings.lefty ? "1" : "0"} style={{ "--ck": ({ S: 0.85, M: 1, L: 1.2, XL: 1.4 })[settings.ctlSize || "L"] }} aria-hidden="true"><i className="cp-joy"><b /></i><i className="cp-a">A</i><i className="cp-b" /><i className="cp-s" /><i className="cp-s2" /></div>
+                    <p>Left-handed puts the stick on the right and the buttons on the left. A fixed stick stays in its corner; a floating one appears under your thumb.</p>
+                  </section>
+                  <section className="dz-sec">
+                    <h3>Dialogue</h3>
+                    <div className="dz-srow"><span>Text speed</span><div className="dz-opts">{[[1, "Slow"], [2, "Normal"], [3, "Fast"]].map(([v, l]) => <button key={v} id={`dz-tspeed-${v}`} className="dz-opt" aria-pressed={(settings.textSpeed || 2) === v} onClick={() => setSettings((s) => ({ ...s, textSpeed: v }))}>{l}</button>)}</div></div>
+                    <div className="dz-srow"><span>Auto-advance</span><div className="dz-opts">{[["off", "Off"], ["slow", "Slow"], ["fast", "Fast"]].map(([v, l]) => <button key={v} id={`dz-auto-${v}`} className="dz-opt" aria-pressed={(settings.autoDlg || "off") === v} onClick={() => setSettings((s) => ({ ...s, autoDlg: v, autoLast: v === "off" ? s.autoLast : v }))}>{l}</button>)}</div></div>
+                    <p>Hold the talk button, or press and hold on the box, to hurry through lines you have read.</p>
                   </section>
                   <section className="dz-sec">
                     <h3>Sound</h3>

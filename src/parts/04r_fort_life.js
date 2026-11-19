@@ -331,7 +331,7 @@ QUEST_ENTER_HOOKS.push((G, id) => {
 {
   const k = ASH_QUESTS.find((q) => q[0] === "q_keystone");
   if (k) { k[2] = ["", "Bring a Pillar Keystone from Fort Frostcrown", "Take the Keystone to Gideon in Greywick"]; k[3] = ["", "The Fort's storehouse, in the west stores district. Quieter at night", "The Lamp House, Greywick"]; }
-  const m = ["q_maud", "A Letter for Maud", ["", "Take Ulric's letter to Old Maud in the North Woods"], ["", "Past Oakhaven (the road home opens in a later build)"]];
+  const m = ["q_maud", "A Letter for Maud", ["", "Take Ulric's letter to Old Maud in the North Woods"], ["", "Oakhaven's east gate, then the North Woods trail"]];
   if (!ASH_QUESTS.find((q) => q[0] === "q_maud")) ASH_QUESTS.push(m);
 }
 const _gideon0 = SCRIPTS.gideon;

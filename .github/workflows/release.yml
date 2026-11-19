@@ -24,6 +24,10 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install pillow   # the build re-encodes embedded art as WebP
       - run: npm ci || npm install
       - run: npm run build
       - name: Zip the playable build

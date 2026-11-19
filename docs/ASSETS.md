@@ -127,6 +127,17 @@ Third-party licensed packs live in assets/ ... assets14/ on the author's machine
 - d98b1275
 - e196a1a3
 - f8f4fde3
+- cavebg: cave battle backdrops (from packs4/cavebg), used by concept/battlebg_bake.py
+- fieldbg: outdoor battle backdrops (summerwood, autumnfield, cursed, canyon), used by concept/battlebg_bake.py
+- portal: glowing_ring.png (Totem_animation from the glowing cave pack), kept for portals in a later act; not yet baked
 
 ## assets15
 - craftpix Free Top-Down Trees pixel art (baked into src/parts/02r_tree_data.js by concept/tree_bake.py)
+
+## Act 3 packs (outside the repo folder on the author's machine: packs3 to packs6, and assets12's zip)
+- packs3/cursedobj, packs3/cursedtiles, packs3/undeadobj: craftpix cursed land and undead objects (baked into src/parts/02t_curse_data.js by concept/curse_bake.py)
+- packs3/skel, packs3/ent: craftpix skeleton and ent sprite packs (baked into src/parts/02u_act3_foes_data.js by concept/a3_foes_bake.py; the stone warden comes from assets6/golem)
+- packs4/caveobj, packs4/glowcave: craftpix top-down cave objects and glowing cave tileset (baked into src/parts/02v_cave_data.js by concept/cave_bake.py)
+- packs4/cavebg: cave battle backgrounds (copied to assets9/cavebg)
+- packs5/tiny: craftpix Tiny Monsters (curse creatures, also in 02u_act3_foes_data.js)
+- packs6/grass: craftpix Grassland top-down tileset, unzipped from assets12 (bushes, stones in turf, tufts, pebbles, stumps baked into src/parts/02w_nature_data.js by concept/nature_bake.py)

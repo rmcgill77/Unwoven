@@ -86,6 +86,31 @@ const Sfx = (() => {
   };
 })();
 
+/* small synthesised sounds with no file behind them: the soft tick of dialogue text, and the chimes of notices */
+const Blip = (() => {
+  let ac = null;
+  const tone = (f0, f1, t0, dur, g0, type) => {
+    const o = ac.createOscillator(), g = ac.createGain(); o.type = type || "triangle";
+    o.frequency.setValueAtTime(f0, t0); if (f1) o.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
+    g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(g0, t0 + 0.006); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g).connect(ac.destination); o.start(t0); o.stop(t0 + dur + 0.02);
+  };
+  return {
+    play(kind, v = 1) {
+      const vol = Sfx.vol * v; if (!vol || AWAY.on) return;
+      try {
+        ac = ac || new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === "suspended") ac.resume();
+        const t = ac.currentTime;
+        if (kind === "text") tone(380 + Math.random() * 90, 0, t, 0.035, 0.035 * vol, "triangle");
+        else if (kind === "quest") { tone(523, 0, t, 0.16, 0.08 * vol); tone(659, 0, t + 0.09, 0.16, 0.08 * vol); tone(784, 0, t + 0.18, 0.28, 0.08 * vol); }
+        else if (kind === "level") { tone(392, 784, t, 0.35, 0.07 * vol, "square"); tone(587, 0, t + 0.12, 0.3, 0.05 * vol); }
+        else if (kind === "item") { tone(880, 0, t, 0.07, 0.06 * vol); tone(1175, 0, t + 0.06, 0.12, 0.06 * vol); }
+        else if (kind === "tick") tone(660, 0, t, 0.03, 0.04 * vol);
+      } catch (e) { /* no audio here */ }
+    },
+  };
+})();
+
 /* which ambience fits the place */
 function ambienceFor(def, mapId, night) {
   if (!def) return null;

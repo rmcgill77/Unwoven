@@ -10,7 +10,7 @@ const { boot, jump } = require('./common');
   for (const sp of spots) {
     const [m, x, y, night] = sp.split(',');
     await pg.evaluate(([m, x, y]) => window.__durinn.eng.warp(m, +x, +y, 'down', { dur: 0.1 }), [m, x, y]);
-    await pg.waitForTimeout(1800);
+    await pg.waitForTimeout(+(process.env.WAIT || 1800));
     if (night) { await pg.evaluate(() => window.__durinn.eng.setNight(true, false)); await pg.waitForTimeout(500); }
     await pg.screenshot({ path: `shots2/${process.env.OUT || 'spot'}_${m}_${x}_${y}.png` });
     if (night) await pg.evaluate(() => window.__durinn.eng.setNight(false, false));

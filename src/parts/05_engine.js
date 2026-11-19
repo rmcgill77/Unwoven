@@ -38,6 +38,8 @@ const PROP_DEFS = {
   memorial: { fw: 1, fh: 1, look: "memorial" }, frame: { fw: 3, fh: 2, look: "frame" }, timber: { fw: 2, fh: 1, look: "timber" },
   banner: { fw: 1, fh: 1, frames: 2, look: "banner" }, ubanner: { fw: 1, fh: 1, frames: 2, look: "ubanner" }, stall: { fw: 2, fh: 1, look: "stall" }, tarp: { fw: 2, fh: 1, look: "tarp" },
   wagon: { fw: 2, fh: 1, look: "wagon" }, sentry: { fw: 1, fh: 1, look: "sentry" }, shrine: { fw: 1, fh: 1, look: "shrine" }, grate: { fw: 1, fh: 1, deco: true, look: "grate" }, dummy: { fw: 1, fh: 1, look: "dummy" },
+  hatch: { fw: 1, fh: 1, deco: true, look: "hatch" },
+  wheel: { fw: 2, fh: 1, frames: 2, look: "millwheel" },
   lantern: { fw: 1, fh: 1, wall: true, light: { r: 46, c: PAL.ember, ox: 8, oy: 10, flicker: true, str: 0.9 } },
 };
 
@@ -82,6 +84,7 @@ function npcLookFor(id, G) {
   }
   if (id === "player") return G ? G.look : { skin: 1, hair: 1, hairStyle: "short", cloth: 0, outfit: "tunic", strap: true };
   if (!NPC_DEFS[id]) return null;
+  if (NPC_DEFS[id].heroLook && typeof COMP_LOOK !== "undefined") return { ...COMP_LOOK[compKey(G)] };   // the hero not chosen has a hero's own sprite
   // an NPC never borrows the player's sprite: anyone without a set of their own gets a townsperson's, picked by name
   const pool = typeof NPC_SETS !== "undefined" ? Object.values(NPC_SETS) : [];
   const fallback = pool.length ? pool[[...id].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) >>> 0, 7) % pool.length] : null;
@@ -94,7 +97,7 @@ function buildVars(G, hour) {
   const v = {
     name: G.name, surname: PLAYER_SURNAME, full: `${G.name} ${PLAYER_SURNAME}`, mentor: G.mentorName, mayor: G.mayorName,
     trade: t.name, trade_lower: t.name.toLowerCase(), station: t.stationName, station_cap: cap(t.stationName),
-    product: t.productName, product_cap: cap(t.productName), job_name: t.jobName, order: t.order,
+    comp: typeof compName === "function" ? compName(G) : "", product: t.productName, product_cap: cap(t.productName), job_name: t.jobName, order: t.order,
   };
   const PR = { she: { they: "she", them: "her", their: "her", kid: "lass", are: "is" }, he: { they: "he", them: "him", their: "his", kid: "lad", are: "is" }, they: { they: "they", them: "them", their: "their", kid: "youngster", are: "are" } }[G.pro || "they"];
   Object.assign(v, PR, { They: cap(PR.they), Their: cap(PR.their) });
@@ -163,8 +166,48 @@ function buildShade(def, cells, w, h, props) {
   return c;
 }
 
+/* Rock laid out on the tile grid comes out in boxes. Before a map is built its cliffs are weathered: outer corners
+   crumble away (twice, so they round off), and long straight edges lose the odd tile. Rock only ever turns to
+   ground, never the reverse, and only where the rock behind is at least two more tiles thick, away from doors,
+   cave mouths, roads and props, so no wall is pierced and no way is blocked. */
+function weatherCliffs(id, def, cells) {
+  if (!cells.some((r) => r.includes("C"))) return;
+  const h = cells.length, w = cells[0].length, at = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? "C" : cells[y][x]);
+  const isC = (x, y) => at(x, y) === "C", ground = (c) => c === "." || c === "," || c === "*";
+  const keep = new Set();
+  const mark = (x0, y0, r) => { for (let j = -r; j <= r; j++) for (let i = -r; i <= r; i++) keep.add((x0 + i) + "," + (y0 + j)); };
+  for (const wp of def.warps || []) mark(wp.x, wp.y, 2);
+  for (const p of def.props || []) mark(p.x, p.y, 2);
+  for (const t of def.triggers || []) mark(t.x, t.y, 1);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const c = cells[y][x]; if (c === "O") mark(x, y, 2); else if (!ground(c) && c !== "C" && c !== "T" && c !== "b" && c !== "r") mark(x, y, 1); }
+  const D = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+  let seed = 0; for (const ch of id) seed = (seed * 31 + ch.charCodeAt(0)) | 0;
+  const rnd = (x, y, k) => { let v = Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(seed + k, 1442695041); v = Math.imul(v ^ (v >>> 13), 1274126177); return ((v ^ (v >>> 16)) >>> 0) / 4294967296; };
+  const thick = (x, y, dx, dy) => isC(x - dx, y - dy) && isC(x - 2 * dx, y - 2 * dy) && isC(x - 3 * dx, y - 3 * dy);
+  for (let pass = 0; pass < 3; pass++) {
+    const out = [];
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      if (cells[y][x] !== "C" || keep.has(x + "," + y)) continue;
+      const open = D.map(([dx, dy]) => ground(at(x + dx, y + dy)));
+      const n = open.filter(Boolean).length; if (!n || n > 2) continue;
+      if (D.some(([dx, dy], k) => !open[k] && !isC(x + dx, y + dy))) continue;   // only plain rock about it
+      if (n === 2) {   // an outer corner: two open sides that meet
+        const k = open.indexOf(true), k2 = open.lastIndexOf(true); if (k2 - k === 2) continue;
+        const [ax, ay] = D[k], [bx, by] = D[k2];
+        if (!thick(x, y, ax, ay) || !thick(x, y, bx, by) || !isC(x - ax - bx, y - ay - by)) continue;
+        if (rnd(x, y, pass) < [0.9, 0.6, 0.25][pass]) out.push([x, y]);
+      } else if (pass === 0) {   // a notch out of a long straight edge
+        const k = open.indexOf(true), [dx, dy] = D[k];
+        if (!thick(x, y, dx, dy) || !isC(x + dy, y + dx) || !isC(x - dy, y - dx) || !isC(x + 2 * dy, y + 2 * dx) || !isC(x - 2 * dy, y - 2 * dx)) continue;
+        if (rnd(x, y, 9) < 0.06) out.push([x, y]);
+      }
+    }
+    for (const [x, y] of out) cells[y][x] = ".";
+  }
+}
 function prepareMap(id, def, art, trade) {
   const cells = def.rows.map((r) => r.split(""));
+  if (def.outside && !def.noWeather) weatherCliffs(id, def, cells);
   const h = cells.length, w = cells[0].length;
   const at = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? null : cells[y][x]);
   const solid = new Uint8Array(w * h);
@@ -265,7 +308,7 @@ function createEngine(canvas, root, hooks) {
     player: { x: 0, y: 0, dir: "down", anim: 0, moving: false },
     npcs: {}, looks: {}, cam: { x: 0, y: 0 }, t: 0, particles: [], blocked: false, wolves: [], critters: [], smoke: [], emotes: [], shakeT: 0, shakeA: 0, encounter: null, lightT: 0, scan: null, breathT: 0,
     fade: null, target: null, view: { w: 320, h: 180, scale: 1 }, settings: { ...DEFAULT_SETTINGS },
-    attractTime: 19.6 * 60, passOutSent: false, hudTimer: 0, fpsFrames: 0, fpsTime: 0, fps: 0,
+    trail: [], fol: {}, attractTime: 19.6 * 60, passOutSent: false, hudTimer: 0, fpsFrames: 0, fpsTime: 0, fps: 0,
   };
   const input = { keys: new Set(), jx: 0, jy: 0 };
   const rand = mulberry32(Date.now() & 0xffff);
@@ -436,6 +479,7 @@ function createEngine(canvas, root, hooks) {
     n.map = e.map; n.path = null; n.leaving = null; n.wait = 0; n.hidden = false;
     if (e.map) { const [x, y] = tileCenter(e.x, e.y); n.x = x; n.y = y; }
     if (e.via) n.lastVia = e.via;
+    if (e.face) { n.face = e.face; n.dir = e.face; }   // someone set to face a way: soldiers squaring up across a road
   }
 
   function settleNpcs() {
@@ -591,6 +635,13 @@ function createEngine(canvas, root, hooks) {
     if (c === "P") { const pl = nearestPillar(m.def, tx * TILE + 8, ty * TILE + 8); if (pl) return { kind: "look", key: "pillar:" + pl.id, x: pl.x, y: pl.base - 50 }; }
     if (c === "g") return { kind: "look", key: "gate", x: tx * TILE + 8, y: ty * TILE - 2 };
     if (c === "Z") return { kind: "look", key: "barricade", x: tx * TILE + 8, y: ty * TILE - 2 };
+    if (m.def.south && (c === "H" || c === "F")) {   // southern Etharis: whichever town's wall or gate this is
+      const t = (m.def.towns || []).find((z) => tx >= z[0] - 1 && tx <= z[2] + 1 && ty >= z[1] - 1 && ty <= z[3] + 1);
+      return { kind: "look", key: (c === "H" ? "gate_" : "wall_") + (t ? t[4] : "capital"), x: tx * TILE + 8, y: ty * TILE - 2 };
+    }
+    if (c === "q") return { kind: "look", key: "quarantine", x: tx * TILE + 8, y: ty * TILE - 2 };
+    if (c === "k") return { kind: "look", key: "growth", x: tx * TILE + 8, y: ty * TILE - 2 };
+    if (c === "O" && m.def.south) return { kind: "look", key: "pass", x: tx * TILE + 8, y: ty * TILE - 2 };
     if (c === "H") return { kind: "look", key: m.def.fort ? (ty < 25 ? "northgate" : "southgate") : "towngate", x: tx * TILE + 8, y: ty * TILE - 2 };
     if (c === "F") return { kind: "look", key: m.def.fort ? "fortwall" : "townwall", x: tx * TILE + 8, y: ty * TILE - 2 };
     if (c === "c") {
@@ -720,9 +771,23 @@ function createEngine(canvas, root, hooks) {
     }
   }
 
+  /* the party falls in behind the player: a trail laid back the way they came, kept clear of walls */
+  function resetFollowers(x, y, dir) {
+    if (x === undefined) { x = s.player.x; y = s.player.y; dir = s.player.dir; }
+    const [vx, vy] = DIR_VEC[dir] || [0, 1]; s.trail = []; s.fol = s.fol || {};
+    let bx = x, by = y;
+    for (let k = 0; k < 40; k++) { s.trail.push({ x: bx, y: by }); const nx = bx - vx * 2, ny = by - vy * 2; if (!blockedAt(nx, ny)) { bx = nx; by = ny; } }
+  }
+  /* the big Act 3 sections are kept baked only while near: the last few visited, the rest let go */
+  const lruMaps = [];
   function loadMap(id, tx, ty, dir) {
+    if (MAP_DEFS[id] && MAP_DEFS[id].lru) {
+      const i = lruMaps.indexOf(id); if (i >= 0) lruMaps.splice(i, 1); lruMaps.push(id);
+      while (lruMaps.length > 3) delete maps[lruMaps.shift()];
+    }
     s.mapId = id; s.map = maps[id];
     const [x, y] = tileCenter(tx, ty);
+    resetFollowers(x, y, dir || "down");
     s.player.x = x; s.player.y = y; s.player.dir = dir || "down"; s.player.moving = false;
     settleNpcs();
     spawnWolves();
@@ -777,9 +842,10 @@ function createEngine(canvas, root, hooks) {
         moveAxis("x", (ix / len) * spd * dt);
         moveAxis("y", (iy / len) * spd * dt);
         p.anim += dt * 8 * Math.max(0.6, mag);
+        { const tr = s.trail || (s.trail = []), l0 = tr[0]; if (!l0 || Math.hypot(p.x - l0.x, p.y - l0.y) >= 2) { tr.unshift({ x: p.x, y: p.y }); if (tr.length > 120) tr.length = 120; } }   // the path the party follows
         const wp = s.map.warpAt.get(`${Math.floor(p.x / TILE)},${Math.floor(p.y / TILE)}`);
         const L = wp && wp.lock, barred = L && s.G && ((L.night && isNightT(s.G.time)) || (L.need && !s.G.flags[L.need]) || (L.flag && s.G.flags[L.flag] && !s.G.flags[L.unless]));
-        const barSay = barred && (L.night && isNightT(s.G.time) ? L.sayNight || L.say : L.say);
+        const barSay = barred && (L.night && isNightT(s.G.time) ? L.sayNight || L.say : L.alt && s.G.flags[L.alt.flag] ? L.alt.say : L.say);
         if (barred && !s.fade) {   // a gate shut from the other side: step back, and hear why
           const [vx, vy] = DIR_VEC[wp.dir] || [0, 0]; p.x = (wp.x - vx) * TILE + 8; p.y = (wp.y - vy) * TILE + 12; p.moving = false;
           if (!s.barredT || s.t - s.barredT > 1.5) { s.barredT = s.t; hooks.onWarpBlocked && hooks.onWarpBlocked(barSay); }
@@ -787,6 +853,13 @@ function createEngine(canvas, root, hooks) {
           p.y = (wp.y - 1) * TILE + 12; p.moving = false; hooks.onWarpBlocked && hooks.onWarpBlocked();
         } else if (wp && !s.fade) {
           fadeTo(() => { loadMap(wp.to, wp.tx, wp.ty, wp.dir); hooks.onEnterMap && hooks.onEnterMap(wp.to); });
+        }
+        if (!s.fade && s.G && s.map.def.triggers) {   // places that start something when you walk into them (an ambush on the road, a camp that sees you coming)
+          const ptx = p.x / TILE, pty = p.y / TILE, inT = s.inTrig || (s.inTrig = new Set());
+          for (const t of s.map.def.triggers) {
+            const k = s.mapId + ":" + t.id, inside = Math.hypot(ptx - t.x - 0.5, pty - t.y - 0.5) <= (t.r || 3);
+            if (inside && !inT.has(k)) { inT.add(k); hooks.onTrigger && hooks.onTrigger(t.id); } else if (!inside) inT.delete(k);
+          }
         }
       } else p.anim = 0;
       // cutscene: the player walks where the scene puts them
@@ -856,8 +929,9 @@ function createEngine(canvas, root, hooks) {
     set(h.place, fillText(s.map.def.name, buildVars(G)));
     set(h.time, `Day ${G.day} · ${isNightT(G.time) ? "Night" : "Day"}`);
     if (h.time && h.time.parentNode) { const nv = isNightT(G.time) ? "1" : "0"; if (h.time.parentNode.dataset.night !== nv) h.time.parentNode.dataset.night = nv; }
-    set(h.coins, `${G.coins} coppers`);
-    set(h.ley, r.label);
+    set(h.coins, `${G.coins}`);
+    set(h.ley, r.label.split(",")[0]);
+    if (h.ley && h.ley.title !== r.label) h.ley.title = r.label;
     if (h.bar) { h.bar.style.width = Math.round(r.value * 100) + "%"; h.bar.dataset.wild = r.wild ? "1" : "0"; }
     set(h.fps, s.settings.fps ? `${s.fps} fps · ${s.view.w}×${s.view.h} @${s.view.scale}x` : "");
   }
@@ -922,6 +996,19 @@ function createEngine(canvas, root, hooks) {
       else ents.push({ img: getSheet(look)[dir][sheetFr], x: Math.round(x - 8), y: Math.round(y - 24), sortY: y, old: true });
     };
     if (s.mode === "play") pushChar(s.G.look, p.dir, p.moving, p.anim, p.x, p.y, p.moving ? Math.floor(p.anim) % 4 : 0, p);
+    if (s.mode === "play" && !s.stage && s.G && s.G.partyIds && typeof partyLook === "function") {   // whoever walks with you follows a step or two behind, along your own path
+      const tr = s.trail || (s.trail = []); let i0 = 0, acc = 0;
+      s.G.partyIds.filter((k) => k !== "wren").forEach((id, n) => {
+        const n0 = s.npcs[id]; if (n0 && n0.map === s.mapId && !n0.hidden) return;   // they are standing here in their own right
+        const want = 21 * (n + 1);
+        while (i0 < tr.length - 1 && acc < want) { acc += Math.hypot(tr[i0].x - tr[i0 + 1].x, tr[i0].y - tr[i0 + 1].y); i0++; }
+        const pt = tr[i0] || { x: p.x, y: p.y }, ahead = tr[Math.max(0, i0 - 4)] || { x: p.x, y: p.y };
+        const f = s.fol[id] || (s.fol[id] = { anim: 0, dir: "down" }), dx = ahead.x - pt.x, dy = ahead.y - pt.y;
+        if (p.moving && Math.hypot(dx, dy) > 0.5) { f.dir = Math.abs(dx) > Math.abs(dy) * 0.8 ? (dx > 0 ? "right" : "left") : dy > 0 ? "down" : "up"; f.anim += 0.14; }
+        else if (!p.moving) f.dir = p.dir === "up" ? "up" : f.dir;
+        pushChar(partyLook(s.G, id), f.dir, p.moving, f.anim, pt.x, pt.y, 0, f);
+      });
+    }
     if (s.stage) for (const a of s.stage.actors || []) {
       const k = s.t - s.stage.t0;
       let x = a.x, y = a.y, mv = false, dir = a.dir || "down";
@@ -1242,6 +1329,21 @@ function createEngine(canvas, root, hooks) {
 
   return {
     input, art,
+    /* dev/test: the whole map, ground and every standing piece, at world pixel density (for environment audits) */
+    mapShot(id, x0 = 0, y0 = 0, x1 = 1e9, y1 = 1e9) {
+      ensureMaps((s.G && s.G.trade) || "smith");
+      const m = maps[id]; if (!m) return null;
+      const W = Math.min(m.base.width, x1 * WZ) - x0 * WZ, H = Math.min(m.base.height, y1 * WZ) - y0 * WZ;
+      const c = makeCanvas(W, H), g = c.getContext("2d"); g.imageSmoothingEnabled = false;
+      g.drawImage(m.base, -x0 * WZ, -y0 * WZ);
+      const ff = 0;
+      for (const t of [...m.talls].sort((a, b) => a.sortY - b.sortY)) {
+        const img = t.frames ? t.frames[ff] : t.lit ? t.lit[0] : t.img; if (!img) continue;
+        if (t.hi) g.drawImage(img, Math.round((t.x - x0) * WZ), Math.round((t.y - y0) * WZ));
+        else g.drawImage(img, (t.x - x0) * WZ, (t.y - y0) * WZ, img.width * WZ, img.height * WZ);
+      }
+      return c.toDataURL("image/png");
+    },
     /* the intro slides: a fixed shot of a real map, staged actors and scene effects drawn on the world's pixel grid */
     stage(cfg) {
       if (!cfg) { if (s.stage) { s.stage = null; resize(); this.attract(); } return; }
@@ -1338,6 +1440,7 @@ function createEngine(canvas, root, hooks) {
       }
     },
     refreshWorld() { refreshWorld(); settleNpcs(); },
+    resetFollowers: () => resetFollowers(),
     playerTile: () => [Math.floor(s.player.x / TILE), Math.floor((s.player.y - 2) / TILE)],
     resolveEncounter(outcome) {
       const w = s.encounter; s.encounter = null; if (!w) return;

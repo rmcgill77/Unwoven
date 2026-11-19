@@ -111,7 +111,7 @@ const SHOP_STOCK = ["bread", "candle", "tonic", "rope", "ink", "poultice"];
 /* props: furniture placed on tiles { p, x, y, v?, id?, station? }    */
 /* warps: walk onto (x,y) to arrive at map `to`, tile (tx,ty)          */
 /* ------------------------------------------------------------------ */
-const SOLID_TILES = new Set(["T", "~", "R", "W", "w", "f", "S", "P", "b", "r", "#", "Z", "g", "X", "U", "Y", "L", "K", "C", "F", "H"]);
+const SOLID_TILES = new Set(["T", "~", "R", "W", "w", "f", "S", "P", "b", "r", "#", "Z", "g", "X", "U", "Y", "L", "K", "C", "F", "H", "k", "q"]);
 
 const MAP_DEFS = {
   oak: {
@@ -1603,10 +1603,11 @@ const DICE_FOLK = {
 
 
 /* The north barricade opens for the Day 4 errand; after the fire the town is rubble. */
-const WORLD_DYNAMIC = ["oak", "rocks"];
+const WORLD_DYNAMIC = ["oak", "rocks", "eth01"];
 function worldDef(id, flags) {
   const base = MAP_DEFS[id];
   if (!base || !flags) return base;
+  if (base.warps && base.warps.some((w) => w.sealedUntil)) return { ...base, warps: base.warps.map((w) => (w.sealedUntil && !flags[w.sealedUntil] ? { ...w, sealed: true } : w)) };   // a way walled until a story beat opens it
   if (id === "rocks") return flags.moved_seal ? { ...base, props: base.props.filter((p) => p.id !== "seal") } : base;
   if (id !== "oak" || (!flags.d4_open && !flags.south_open && !flags.d5_ash && !flags.d4_fire)) return base;
   if (flags.oak_rebuilt) return oakRebuilt(base, flags);

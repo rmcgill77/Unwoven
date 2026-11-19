@@ -9,23 +9,23 @@ for (const id in MAP_DEFS) for (const p of MAP_DEFS[id].pillars || []) if (!PILL
 
 /* what things say on the plains, where it differs from home */
 MAP_DEFS.plainsSW.looks = {
-  barricade: ["Fallen timber, dragged across the trail and left. Beyond it the West Light Forest closes in, dark and quiet.", "Someone has carved a cut thread into the top log. (The West Forest opens in a later build.)"],
+  barricade: ["Fallen timber, dragged across the trail and left. Beyond it the West Light Forest closes in, dark and quiet.", "Someone has carved a cut thread into the top log."],
   townwall: ["A town wall: dressed stone, kept in good repair. Over it, rooftops and chimney smoke."],
   towngate: ["Ashford's north gate, open by day. Covenant banners hang either side, purple and gold.", "Beyond the arch: a cobbled street, roofs, the chapel's slate spire."],
   farm: ["A cellar door under fallen beams. The farm burned years ago; the tithe-men came the season after anyway."],
 };
 MAP_DEFS.plainsSE.looks = {
-  barricade: ["A palisade of sharpened stakes across the trail, new and badly made. Bandit work. (The East Forest opens in a later build.)"],
+  barricade: ["A palisade of sharpened stakes across the trail, new and badly made. Bandit work."],
   wagon: ["A cart burned to its axles. The horses are gone; the driver is not.", "Scratched into the tailboard, under the soot: a thread, cut through."],
   wayfire: ["A ring of stones round old ash. Travellers stop here, but only after dark, and never for long."],
 };
 MAP_DEFS.plainsNW.looks = {
   towngate: ["Greywick's gate hangs open on its hinges. Nobody stands watch.", "Someone has painted over the Covenant sigil on the arch. Badly, and recently."],
   townwall: ["Greywick's wall: old stone, patched with timber where it has fallen. The roofs behind it sag."],
-  gate: ["Greywick's gate hangs crooked on one hinge, tied shut with rope. (Greywick opens in a later build.)", "Someone has painted over the Covenant sigil on the crossbar. Badly, and recently."],
+  gate: ["Greywick's gate hangs crooked on one hinge, tied shut with rope.", "Someone has painted over the Covenant sigil on the crossbar. Badly, and recently."],
 };
 MAP_DEFS.plainsNE.looks = {
-  barricade: ["A Covenant barrier of iron-shod beams. Past it the road climbs into the Frostcrown March. (The Outskirts open in a later build.)"],
+  barricade: ["A Covenant barrier of iron-shod beams. Past it the road climbs into the Frostcrown March."],
 };
 
 /* chests out in the open: coins, things, and sometimes a recipe note */

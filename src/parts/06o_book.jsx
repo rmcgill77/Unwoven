@@ -107,7 +107,7 @@ const BK = 4, BOOK_DW = BOOK_W * BK, BOOK_DH = BOOK_H * BK;
 const STAGE_W = BOOK_DW + 190, STAGE_H = BOOK_DH + 24;
 const PG = (b) => ({ left: b[0] * BK, top: b[1] * BK, width: (b[2] - b[0]) * BK, height: (b[3] - b[1]) * BK });
 const PL = PG(BOOK_PAGES.L), PR = PG(BOOK_PAGES.R);
-const BOOK_TABS = [["words", "Words", "#76281f", "magic"], ["map", "Map", "#2c4a38", "adv"], ["beasts", "Beasts", "#363e68", "beast"], ["quests", "Quests", "#705824", "adv"]];
+const BOOK_TABS = [["words", "Words", "#76281f", "magic"], ["map", "Map", "#2c4a38", "adv"], ["beasts", "Beasts", "#363e68", "beast"], ["quests", "Journal", "#705824", "adv"]];
 const BOOK_CSS = `
 .bk-ov{position:absolute;inset:0;z-index:60;background:rgba(8,6,10,.72);display:grid;place-items:center;overflow:hidden;touch-action:none}
 .bk-stage{position:absolute;left:50%;top:50%;transform-origin:0 0;font-family:'Pixelify Sans',ui-monospace,monospace;color:#34241a}
@@ -364,42 +364,95 @@ function BeastPages({ G, hide, flip }) {
   </>);
 }
 
-/* --- Quests --- */
+/* --- Quests: the Journal (V93) --- */
+/* Grouped by act, with what's done kept (struck through) under what's still open, and a Notes page that gathers
+   what the party has learned about the threads running through the story. */
+function journalNotes(G) {
+  const f = G.flags, n = [];
+  if (f.arthur_clue || f.q_arthur || f.hakon_capital) {
+    const l = [];
+    if (f.arthur_clue) l.push("Hakon's brother Arthur was taken by the Iron Cleave and sold south.");
+    if ((f.q_arthur | 0) >= 1) l.push("The trail led to the mines of the Western Crags.");
+    if (f.hakon_capital) l.push("The overseer's ledger: Arthur was sold on to Sub-Warden Hale of the Archon's Foundry, Capital City.");
+    n.push({ h: "Arthur's trail", l });
+  }
+  if (f.q_comp) {
+    const l = [], s = f.q_comp | 0;
+    l.push("The former Initiate is looking for a tome like yours, one the College sent away.");
+    if (s >= 2) l.push("Its record went into Aurelm's sealed stacks.");
+    if (s >= 3) l.push("It was carried to the Great Sanctum in Capital City three winters past, \"not to be spoken of.\"");
+    n.push({ h: "The far tome", l });
+  }
+  const cs = f.comp_story | 0;
+  if (cs) {
+    const l = ["Teo, a cook's son with no Weaver line, carried the instruments and listened at the back of the College's lessons."];
+    if (cs >= 2) l.push("When the Initiates wove a light, Teo's came too, and brighter than any of theirs.");
+    if (cs >= 3) l.push("Arbitrators took him north in a closed cart. The College record says he fell from a ledge.");
+    if (cs >= 4 || f.comp_story_done) l.push("Asking after Teo cost the Initiate their ring and their place. Magic isn't in the blood.");
+    n.push({ h: "The Initiate's story", l });
+  }
+  if (f.vex_thief || f.capital_letter) {
+    const l = [];
+    if (f.vex_thief) l.push("Kellan Vex robbed Aurelm's Vault in the spring, looking for your tome.");
+    if (f.capital_letter) l.push("He is still looking. The Vaultwarden's letter opens the Capital Gate.");
+    n.push({ h: "Kellan Vex", l });
+  }
+  return n;
+}
 function QuestPages({ G, hide, flip, tasks }) {
-  const log = typeof questLog === "function" && G.flags.act2 ? questLog(G) : [];
-  const entries = [{ key: "_now", name: "What's next", now: true }, ...log.filter((q) => !q.done), ...log.filter((q) => q.done)];
+  const f = G.flags, curAct = f.act2_end ? 3 : f.act2 ? 2 : 1;
+  const [act, setAct] = useState(curAct);
+  const all = typeof ASH_QUESTS !== "undefined" && f.act2 ? ASH_QUESTS.filter(([k]) => qs(G, k) > 0).map(([k, name, steps]) => ({ key: k, name, done: qs(G, k) >= steps.length, act: typeof questAct === "function" ? questAct(k) : 2 })) : [];
+  const actOne = { key: "_act1", name: "The Apprentice of Oakhaven", done: !!f.act2, act: 1 };
+  const inAct = act === 1 ? [actOne] : all.filter((q) => q.act === act);
+  const notes = journalNotes(G);
+  const entries = [...(act === curAct ? [{ key: "_now", name: "What's next", now: true }] : []), ...inAct.filter((q) => !q.done), ...inAct.filter((q) => q.done), ...(notes.length ? [{ key: "_notes", name: "Notes", notes: true }] : [])];
   const [sel, setSel] = useState("_now"), [lp, setLp] = useState(0), [rp, setRp] = useState(0);
-  const LPP = 8, lPages = Math.max(1, Math.ceil(entries.length / LPP));
-  const cur = entries.find((e) => (e.key || e.name) === sel) || entries[0];
+  const LPP = 7, lPages = Math.max(1, Math.ceil(entries.length / LPP));
+  const cur = entries.find((e) => e.key === sel) || entries[0] || { key: "_none", name: "Nothing yet" };
   let lines = [];
   if (cur.now) lines = tasks.filter((t) => !t.done).map((t) => ({ t: t.text, h: t.hint, now: true }));
+  else if (cur.notes) for (const nt of notes) { lines.push({ head: nt.h }); for (const l of nt.l) lines.push({ t: l, note: true }); }
+  else if (cur.key === "_act1") lines = [
+    { t: `Apprenticed in Oakhaven, to ${G.mentorName || "the master"}`, done: true }, { t: "Found the tome, and learned its first words", done: !!(f.d2_tome || f.act2) },
+    { t: "Oakhaven burned", done: !!(f.d4_fire || f.act2) }, { t: "Set out across the Frostcrown Plains", done: !!f.act2 }];
   else {
-    const q = ASH_QUESTS.find((x) => x[1] === cur.name), s = q ? qs(G, q[0]) : 0;
+    const q = ASH_QUESTS.find((x) => x[0] === cur.key), s = q ? qs(G, q[0]) : 0;
     if (q) for (let j = 1; j < q[2].length && j <= s; j++) lines.push({ t: q[2][j], h: j === s && s < q[2].length ? q[3][j] : null, done: j < s || s >= q[2].length, now: j === s && s < q[2].length });
     if (q && s >= q[2].length) lines.push({ t: "Done.", done: true });
   }
   const W = PR.width - 30, room = PR.height - 70 - 60;
-  const pages = paginate(lines, (l) => linesOf(l.t, 22, W) * 29 + (l.h ? linesOf(l.h, 19, W) * 25 : 0) + 16, room);
-  const page = pages[Math.min(rp, pages.length - 1)];
+  const pages = paginate(lines, (l) => (l.head ? 40 : linesOf(l.t, 22, W) * 29 + (l.h ? linesOf(l.h, 19, W) * 25 : 0) + (l.note ? 6 : 16)), room);
+  for (let k = 0; k + 1 < pages.length; k++) while (pages[k].length > 1 && pages[k][pages[k].length - 1].head) pages[k + 1].unshift(pages[k].pop());   // no heading left at the foot of a page
+  const page = pages[Math.min(rp, pages.length - 1)] || [];
+  const acts = [1, ...(f.act2 ? [2] : []), ...(f.act2_end ? [3] : [])];
+  const pick = (a) => { setAct(a); setSel(a === curAct ? "_now" : "_first"); setLp(0); setRp(0); };
+  const shown = cur;
   return (<>
     <Page side="L" hide={hide} id="bk-quests-l">
-      <h2 className="bk-h1">Quests</h2>
-      <div style={{ display: "grid", gap: 6, marginTop: 10, height: LPP * 52 }}>
+      <h2 className="bk-h1">Journal</h2>
+      <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+        {acts.map((a) => <button key={a} id={`bk-jact-${a}`} className="bk-btn" aria-pressed={act === a} onClick={() => pick(a)} style={{ fontSize: 19, padding: "2px 12px" }}>Act {["", "I", "II", "III"][a]}</button>)}
+      </div>
+      <div style={{ display: "grid", gap: 6, marginTop: 10, height: LPP * 50 }}>
         {entries.slice(lp * LPP, lp * LPP + LPP).map((e) => {
-          const id = e.key || e.name;
-          return <button key={id} id={`bk-q-${id.replace(/[^a-z]/gi, "")}`} className="bk-btn" aria-pressed={sel === id} onClick={() => { setSel(id); setRp(0); }}
-            style={{ height: 46, textAlign: "left", fontSize: 22, color: e.done ? "#968470" : "#34241a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{e.done ? "✓ " : ""}{e.name}</button>;
+          const id = e.key, on = (shown && shown.key) === id;
+          return <button key={id} id={`bk-q-${(e.key === "_now" || e.key === "_notes" || e.key === "_act1" ? e.key : e.name).replace(/[^a-z0-9]/gi, "")}`} className="bk-btn" aria-pressed={on} onClick={() => { setSel(id); setRp(0); }}
+            style={{ height: 44, textAlign: "left", fontSize: 21, color: e.done ? "#968470" : "#34241a", textDecoration: e.done ? "line-through" : "none", textDecorationColor: "rgba(90,60,40,.5)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            <span style={{ color: e.done ? "#5a7a3a" : e.notes ? "#3c5a7a" : "#7a2a20", display: "inline-block", width: 26, textDecoration: "none" }}>{e.done ? "✓" : e.notes ? "✎" : e.now ? "▸" : "◆"}</span>{e.name}</button>;
         })}
       </div>
       <div style={{ position: "absolute", left: 0, bottom: 0 }}><Pager n={lPages} i={lp} set={(v) => flip(v > lp ? 1 : -1, () => setLp(v))} id="bk-qlist" /></div>
     </Page>
     <Page side="R" hide={hide} id="bk-quests-r">
-      <h2 className="bk-h1 bk-clamp2" style={{ fontSize: cur.name.length > 20 ? 30 : 36 }}>{cur.name}</h2>
-      <div style={{ marginTop: 12, display: "grid", gap: 16, paddingRight: 30 }}>
-        {page.length ? page.map((l, j) => <div key={j}>
-          <div className="bk-t" style={{ color: l.done ? "#968470" : "#34241a" }}>{l.done ? "✓ " : l.now ? "• " : ""}{l.t}</div>
-          {l.h ? <div className="bk-s" style={{ marginTop: 2 }}>{l.h}</div> : null}
-        </div>) : <div className="bk-t">Nothing pressing.</div>}
+      <h2 className="bk-h1 bk-clamp2" style={{ fontSize: (shown ? shown.name : "").length > 20 ? 30 : 36 }}>{shown ? shown.name : ""}</h2>
+      <div style={{ marginTop: 12, display: "grid", gap: 10, paddingRight: 30 }}>
+        {shown ? (page.length ? page.map((l, j) => l.head
+          ? <div key={j} className="bk-h2" style={{ color: "#5a2418", marginTop: j ? 8 : 0 }}>{l.head}</div>
+          : <div key={j}>
+            <div className="bk-t" style={{ color: l.done ? "#968470" : "#34241a" }}>{l.done ? "✓ " : l.now ? "• " : ""}{l.t}</div>
+            {l.h ? <div className="bk-s" style={{ marginTop: 2 }}>{l.h}</div> : null}
+          </div>) : <div className="bk-t">Nothing pressing.</div>) : null}
       </div>
       <div style={{ position: "absolute", left: 0, bottom: 0 }}><Pager n={pages.length} i={Math.min(rp, pages.length - 1)} set={(v) => flip(v > rp ? 1 : -1, () => setRp(v))} id="bk-qsteps" /></div>
     </Page>

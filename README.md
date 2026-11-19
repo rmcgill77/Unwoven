@@ -2,7 +2,9 @@
 
 A mobile-first, landscape pixel RPG in the spirit of classic Zelda, with Final Fantasy-style ATB battles and a magic system built from Old Tongue words (Root + Suffix, e.g. `Pyr-or`, a thrown flame). You play Corin or Elowyn Quill-mark, the orphaned Clerk's apprentice of Oakhaven, in the realm of Etharis on the continent of Talvora.
 
-**This repository holds Acts One and Two**, released as a test build (`0.2.1-act2`). They are one continuous game: Act One ends with the end-of-act card, and pressing Continue opens Act Two (Ashford, the Frostcrown Plains, Greywick, the Outskirts and the fort). Saves made at the end of Act One step into Act Two when loaded.
+**This repository holds Acts One to Three**, released as a test build (`0.3.0-act3`, the author's build V93). They are one continuous game:
+- Act One ends with its end-of-act card, and pressing Continue opens Act Two (Ashford, the Frostcrown Plains, Greywick, the Outskirts and the fort). Saves made at the end of Act One step into Act Two when loaded.
+- Act Two ends at Ashford's south gate. After its end card, the South Road off the plains opens into Act Three, southern Etharis (Rotmoor, Stonebridge, Verrin, Millhaven, Aurelm, the Western Crags), which ends at the Capital Gate.
 
 The whole game is one React component, built from the files in `src/parts/` into a single HTML page plus a React bundle, the music and the sound effects. There is no server: progress saves to the browser's localStorage.
 
@@ -10,6 +12,7 @@ The whole game is one React component, built from the files in `src/parts/` into
 
 ```bash
 npm install          # react 18 + esbuild
+pip install pillow   # optional: the build re-encodes embedded art as lossless WebP (about 40% smaller); without it the art stays PNG
 npm run build        # -> dist/ (release), build/test.html (tests), build/artifact.html (claude.ai)
 npm run serve        # play dist/ at http://localhost:8080
 ```
@@ -23,7 +26,7 @@ Open it on a phone on the same network, or deploy (below). It is played in lands
 To cut a numbered test build, tag it:
 
 ```bash
-git tag v0.2.1-act2 && git push origin v0.2.1-act2
+git tag v0.3.0-act3 && git push origin v0.3.0-act3
 ```
 
 The tag also creates a pre-release on GitHub with the playable build attached as a zip. Testers can unzip it and serve the folder from any static host (opening `index.html` straight from disk also works, but some browsers block the music there).
@@ -45,7 +48,7 @@ The Act Two scripts are Node Playwright scripts in `test/t2/`. Run them from a s
 
 ```bash
 mkdir -p /tmp/t2/shots2 && cd /tmp/t2
-for t in gw os fort act2end ashq ef spar book southroad towngates; do node <repo>/test/t2/$t.js; done
+for t in gw os fort act2end ashq ef spar book southroad towngates etharis rotmoor stonebridge verrin millhaven aurelm crags act3end a3more companion balance; do node <repo>/test/t2/$t.js; done
 ```
 
 `abilities.js` calls `btlFreshMember` from inside the page, which is not exposed on `window`, so it fails at setup until it is updated.
@@ -62,7 +65,7 @@ Run the Python tests from the repository root. "ERR_TUNNEL_CONNECTION_FAILED" co
 | `scripts/build.cjs` | The build. Its `PARTS` list is the concatenation order; add new files there. |
 | `test/` | Act One Playwright tests (Python), the battle simulator, and `test/t2/` (Act Two Playwright scripts, Node) |
 | `tools/bake/` | Python scripts that drew or baked the Act One sprites. They need the raw asset packs in `assets/`, which are not committed. |
-| `tools/concept/`, `tools/envc/` | The Act Two bake and generator scripts (same raw-pack requirement; paths inside point at the author's machine) |
+| `tools/concept/`, `tools/envc/` | The Act Two and Three bake and generator scripts, and `webp_pack.py` (the build's WebP step; cache in `build/.webpcache`) (same raw-pack requirement; paths inside point at the author's machine) |
 | `docs/DESIGN.md` | The game design document |
 | `docs/ASSETS.md` | Which raw asset packs the art was baked from (the packs are not in the repo) |
 | `docs/CREDITS.md` | Credits and asset licences |

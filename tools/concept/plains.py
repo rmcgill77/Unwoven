@@ -265,9 +265,11 @@ def main():
     sign(16, 106, "The West Light Forest. Old Weaver ruins lie deep in it.", "Wolves after dark. Keep to the trail.")
     feats["wforest"] = (14, 104)
     # the South Road ends at a Covenant barricade on the edge of the plains, until Act Three opens it
+    # a gap is left where the road runs through: the Covenant's guard post holds it, and turns travellers back until Act Three
     for x in range(29, 45):
-        if G.get(x, 107) in set("=.,*"): G.set(x, 107, "Z")
-    sign(40, 104, "South: the Etharis road, to the southern provinces.", "Closed by order of the Covenant. Travellers with an Arbitrator's seal leave by Ashford's south gate.")
+        if G.get(x, 107) in set("=.,*") and not 34 <= x <= 39: G.set(x, 107, "Z")
+    props += [{"p": "sentry", "x": 33, "y": 105}, {"p": "banner", "x": 40, "y": 106}]
+    sign(40, 104, "South: the Etharis road, to the southern provinces.", "Closed by order of the Covenant until the roads are safe.")
     feats["south_road"] = (36, 104)
     # burned wagon (108,52): a Purifier mark
     clear_round(108, 54, 5, 3)
@@ -470,6 +472,11 @@ def cut(rows, props, signs, pillars, wild, camps):
     for x in range(145, 154):
         if out["plainsNE"]["rows"][0][x - CUT_X] != "T":
             out["plainsNE"]["warps"].append({"x": x - CUT_X, "y": 0, "to": "os", "tx": min(51, max(46, x - CUT_X)), "ty": 58, "dir": "up"})
+    # southern Etharis (Act 3): the South Road runs off the south edge, through the Covenant's guard post
+    for x in range(30, 45):
+        if out["plainsSW"]["rows"][H - 1 - CUT_Y][x] not in SOLID:
+            out["plainsSW"]["warps"].append({"x": x, "y": H - 1 - CUT_Y, "to": "eth00", "tx": max(34, min(38, x)), "ty": 2, "dir": "down",
+                                             "lock": {"need": "act2_end", "say": "A Covenant guard steps into the road. \"The south is closed. Nobody passes without the Arbitrator's leave.\""}})
     # Ashford: through its open gate at the end of the spur
     for x in (58, 59):
         out["plainsSW"]["warps"].append({"x": x, "y": 79 - CUT_Y, "to": "ash", "tx": x - 46, "ty": 3, "dir": "down"})

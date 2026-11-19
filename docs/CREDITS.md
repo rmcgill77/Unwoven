@@ -39,6 +39,9 @@ craftpix licence: https://craftpix.net/file-licenses/ . The assets may be used i
 
 Some art was drawn in code for this game (the town, buildings, terrain, Odile and other custom figures, the bridge, the UI). The intro map is Ryan's own drawing.
 
+### Act Three art
+Also from **craftpix.net** and recoloured the same way: top-down skeletons, ents and golems, Tiny Monsters (the curse creatures), the cursed land tileset and objects, undead land objects, the Grassland top-down tileset (bushes, stones, tufts, stumps), top-down cave objects, the glowing cave tileset, cave horizontal battle backgrounds, and nature and dry-land battle backgrounds. Raw pack files are not in this repository (see `docs/ASSETS.md`).
+
 ## Type
 Pixelify Sans (Google Fonts, SIL Open Font License), loaded from fonts.googleapis.com.
 

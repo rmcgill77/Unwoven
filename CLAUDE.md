@@ -55,8 +55,18 @@ Read `README.md` for build, test and release. This file covers how the game is p
 - `04e`-`04s`: the wider world, one map file plus a `*_life.js` (NPCs, schedules, scripts) per area: plains, Ashford, west forest, east forest, Greywick, the Outskirts, the fort, then the end of Act Two.
 - `02l`-`02s`: more baked atlases (paving, Ashford chibis, NPC chibis, battle backgrounds, icons, book UI, `02r` trees from the craftpix top-down trees pack, `02s` the top-left HUD from the interface pack). `02h2`/`06e2`: second foe set and its battle code.
 - `06g2`: gear data. `06j_study.jsx`: the study screen. `06l`/`06m`: Ashford and fort late-game. `06n_audio.js`: sound effects and ambience (files in `public/sfx/`, Act Two tracks in `public/music/a2*.mp3`). `06o_book.jsx`: the Book.
-- `06d_chibi.js` is an unused leftover and is not in the build order.
+- `06d_chibi.js` is an unused leftover and is not in the build order (`02d_chibi.js` is the live one; it reads PNG or WebP sheets).
 - **The handoff:** the Act One finale (`d5_wake` in `04_data.js`) sets `act1_end` and runs `{ act: "credits" }`. The end-of-act card's Continue calls `beginAct2` in `07_ui.jsx`, which sets `flags.act2`, makes the Pillar the rest point and starts the tutorial popup. On load, a save with `act1_end` and no `act2` is stepped into Act Two.
+
+**Act Three** (southern Etharis, the author's builds V84-V93):
+- `04t`/`04u`: the Etharis overworld (twelve 90 x 80 sections, only the last three visited stay baked) and its Pillars. Towns, each a map file plus a `*_life.js`: Rotmoor (`04v`/`04w`), Stonebridge (`04x`/`04y`), Verrin Lower and High Town (`04z`/`04z2`), Millhaven (`04z3`/`04z4`), Aurelm and its Vault (`04z5`/`04z6`), the Western Crags and mines (`04z7`/`04z8`).
+- `04z9_act3_end.js`: road clashes, the Capital Gate trigger, `act3_end` and the Act Three card (`credits3`). `04zb_act3_more.js`: the companion's story, Unbound camps, scrutiny, `act3Tasks` (replaces the Act Two task list once `act2_end` is set). `04s2_quest_acts.js`: quests grouped by act for the Journal.
+- `06p_party.js`: the unchosen hero joins as a companion, three walk the road (`PARTY_MAX`), the rest wait in `G.reserve`. `06q_act3_foes.js` with atlas `02u`. `06r_minimap.jsx`: mini-map and area map.
+- Atlases `02t` (curse ground), `02u` (Act Three foes), `02v` (cave dressing), `02w` (Grassland nature props).
+- **The 2 -> 3 handoff:** Ashford's south gate (`look_gate` in `04s_act2_end.js`, needs `q_south` 1) sets `act2_end` and runs `credits2`. Continue saves and returns to the world; the South Road off the bottom of `plainsSW` (around x 36) is barred until `act2_end`, then leads into `eth00`.
+- **Build:** after esbuild, `tools/concept/webp_pack.py` re-encodes every embedded PNG as lossless WebP (cache `build/.webpcache`). It needs Python with Pillow; the release workflow installs it. Locally the step is skipped with a warning if Pillow is missing, and the game still runs with PNGs.
+
+**Incoming handoff zips:** the author's source still carries the old rotate prompt (hidden behind `setTall(false)`). Strip it from `07_ui.jsx` each time (state, effect, pause, JSX block, `.dz-rotate`/`.dz-rphone`/`dzrot` CSS); keep the `pointerdown` landscape-lock request. Their `build2.cjs` part list is the order to copy into `scripts/build.cjs`.
 
 **Maps** are rows of tile characters.
 - **Solid tiles:** `SOLID_TILES` in `04_data.js`.
@@ -101,7 +111,7 @@ Read `README.md` for build, test and release. This file covers how the game is p
   - The Oakhaven north and south gates are barricades that story flags remove, so it reports the arrivals at (23,1)/(24,1) and the rocks warps.
   - A few objects stand behind an identical, reachable twin: the store shelf and barrel, two crates, and a study shelf.
 - **Developer tools are locked** behind a password; only its hash is in the code (`DEV_HASH` in `07_ui.jsx`). It stops casual testers, it is not a security boundary. The password is never committed. `test/t2/common.js` unlocks by storing the hash in localStorage, so the tests need no password; `t2/devlock.js` needs `DEV_PW` in the environment.
-- **Act Two tests:** `test/t2/*.js` (Node Playwright; run from a scratch folder with a `shots2/` directory). The core set is `gw os fort act2end ashq ef spar book southroad towngates` (`towngates` walks through the Ashford, Greywick and Oakhaven gates). `spots.js` screenshots given spots: `SPOTS="map,x,y;..."`. `abilities.js` is stale (it calls `btlFreshMember`, which is not exposed on `window`).
+- **Act Two tests:** `test/t2/*.js` (Node Playwright; run from a scratch folder with a `shots2/` directory). The core set is `gw os fort act2end ashq ef spar book southroad towngates` plus, for Act Three, `etharis rotmoor stonebridge verrin millhaven aurelm crags act3end a3more companion balance` and the V93 interface set `notes dialog93 minimap journal battle93 ui93 cavebg cavedress` (`towngates` walks through the Ashford, Greywick and Oakhaven gates). `spots.js` screenshots given spots: `SPOTS="map,x,y;..."`. `abilities.js` is stale (it calls `btlFreshMember`, which is not exposed on `window`).
 - `test:reach` also reports Act Two items it has no baseline for: decorative banners, stalls and boards in Ashford with no look text, a few NPC spots on solid tiles (Tam, the Outskirts gate guards, the toll keeper), and unreachable shelves and herbs behind twins.
 - After changing foes or party stats, check `test/sim/sim.cjs`. The Thornmother is tuned so a solo player wins at level 5 with the sword, or level 4 with fire magic.
 
@@ -117,5 +127,5 @@ Read `README.md` for build, test and release. This file covers how the game is p
 - The town lawn needs a polish pass; ask Ryan what bothers him about it.
 - The audio mix, and how the touch controls feel on real phones and the Fold, haven't been checked on hardware.
 - Most of the JS is baked atlases. The first-load bake takes a moment on desktop and is covered by a "Loading" screen.
-- Acts One and Two are in (`0.2.1-act2`, Act Two update V83: towns seen from the plains, new trees, new HUD, audio pauses in the background, locked developer tools, tester thanks on both end-of-act cards). Next up: Act Three in southern Etharis (the South Road barricade on the plains opens; the unpicked hero joins as a companion), elves in the Ringval Wilds, a grassland tileset, and the remaining unused packs.
-- The game is now about 3.9 MB of JS plus about 21 MB of audio. Known perf from the Act Two notes: about 45-58 fps at 6x CPU throttle; the night lighting pass and the Outskirts tor are the remaining costs.
+- Acts One to Three are in (`0.3.0-act3`, the author's V93, including the V93 environment and interface pass). Next up: Act Four, the road to the Capital. Elves live mainly in the Ringval Wilds. The portal art (glowing ring, `assets9/portal`) is kept off the repo for a later act.
+- The game is now about 3.5 MB of JS (after WebP) plus about 21 MB of audio. Known perf from the Act Two notes: about 45-58 fps at 6x CPU throttle; the night lighting pass and the Outskirts tor are the remaining costs.

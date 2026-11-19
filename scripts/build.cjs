@@ -11,7 +11,7 @@ const ROOT = path.join(__dirname, ".."), r = (...p) => path.join(ROOT, ...p);
 const pkg = require(r("package.json"));
 
 // concatenation order matters: data before the code that reads it, the UI last (same order as the Act 2 source build)
-const PARTS = ["01_core.js","02_chars.js","02c_chibi_data.js","02f_battle_data.js","02g_elowyn_data.js","02m_ash_chibi_data.js","02n_npc_chibi_data.js","02h_foes_data.js","02h2_foes2_data.js","02j_crit_data.js","02k_map_data.js","02l_pave_data.js","02o_bg_data.js","02p_icon_data.js","02q_book_data.js","02r_tree_data.js","02s_hud_data.js","02i_foes.js","02d_chibi.js","03a_world_p1.js","03b_world.js","03c_grim.js","04_data.js","04b_wilds.js","04c_rooms.js","04e_plains.js","04d_act2.js","04f_plains_life.js","04g_ashford.js","04h_ashford_life.js","04i_wforest.js","04j_wforest_life.js","04k_eforest.js","04l_eforest_life.js","04m_greywick.js","04n_greywick_life.js","04o_outskirts.js","04p_outskirts_life.js","04q_fort.js","04r_fort_life.js","04s_act2_end.js","05_engine.js","06_minigames.js","06e_battle.js","06e2_foes2.js","06f_magic.js","06g2_gear_data.js","06g_gear.js","06l_ash_late.js","06m_fort_late.js","06j_study.jsx","06h_debug.js","06k_music.js","06n_audio.js","06o_book.jsx","06b_splash.jsx","06c_battleart.jsx","06i_intro.jsx","07_ui.jsx"];
+const PARTS = ["01_core.js","02_chars.js","02c_chibi_data.js","02f_battle_data.js","02g_elowyn_data.js","02m_ash_chibi_data.js","02n_npc_chibi_data.js","02h_foes_data.js","02h2_foes2_data.js","02j_crit_data.js","02k_map_data.js","02l_pave_data.js","02o_bg_data.js","02p_icon_data.js","02q_book_data.js","02r_tree_data.js","02s_hud_data.js","02t_curse_data.js","02u_act3_foes_data.js","02v_cave_data.js","02w_nature_data.js","02i_foes.js","02d_chibi.js","03a_world_p1.js","03b_world.js","03c_grim.js","04_data.js","04b_wilds.js","04c_rooms.js","04e_plains.js","04d_act2.js","04f_plains_life.js","04g_ashford.js","04h_ashford_life.js","04i_wforest.js","04j_wforest_life.js","04k_eforest.js","04l_eforest_life.js","04m_greywick.js","04n_greywick_life.js","04o_outskirts.js","04p_outskirts_life.js","04q_fort.js","04r_fort_life.js","04s_act2_end.js","04s2_quest_acts.js","04t_etharis.js","04u_etharis_life.js","04v_rotmoor.js","04w_rotmoor_life.js","04x_stonebridge.js","04y_stonebridge_life.js","04z_verrin.js","04z2_verrin_life.js","04z3_millhaven.js","04z4_millhaven_life.js","04z5_aurelm.js","04z6_aurelm_life.js","04z7_crags.js","04z8_crags_life.js","04z9_act3_end.js","04zb_act3_more.js","05_engine.js","06_minigames.js","06e_battle.js","06e2_foes2.js","06f_magic.js","06g2_gear_data.js","06g_gear.js","06l_ash_late.js","06m_fort_late.js","06p_party.js","06q_act3_foes.js","06j_study.jsx","06h_debug.js","06k_music.js","06n_audio.js","06o_book.jsx","06r_minimap.jsx","06b_splash.jsx","06c_battleart.jsx","06i_intro.jsx","07_ui.jsx"];
 
 const have = new Set(fs.readdirSync(r("src/parts")));
 for (const p of PARTS) if (!have.has(p)) throw new Error("missing part " + p);
@@ -22,8 +22,12 @@ const src = full.replace(/^import React[^\n]*\n/m, "const { useCallback, useEffe
                 .replace(/^export default function /m, "function ");
 fs.mkdirSync(r("build"), { recursive: true });
 fs.writeFileSync(r("build/game.src.jsx"), src);
-const js = esbuild.transformSync(src, { loader: "jsx", jsx: "transform", target: "es2019", minify: true }).code;
-fs.writeFileSync(r("build/game.min.js"), js);
+fs.writeFileSync(r("build/game.min.js"), esbuild.transformSync(src, { loader: "jsx", jsx: "transform", target: "es2019", minify: true }).code);
+// re-encode every embedded PNG as lossless WebP where that is at least 15% smaller (pixel-identical; needs Python + Pillow).
+// Without Pillow the PNGs stay as they are and the game still runs, only larger.
+try { require("child_process").execFileSync("python3", [r("tools/concept/webp_pack.py"), r("build/game.min.js")], { stdio: "inherit" }); }
+catch (e) { if (process.env.CI) throw e; console.warn("note: WebP pass skipped (python3 with Pillow not available); images stay PNG"); }
+const js = fs.readFileSync(r("build/game.min.js"), "utf8");
 if (process.argv.includes("--dev")) fs.writeFileSync(r("build/game.dev.js"), esbuild.transformSync(src, { loader: "jsx", jsx: "transform", target: "es2019" }).code);
 
 const boot = `(function(){var root=ReactDOM.createRoot(document.getElementById("app"));function start(d){root.render(React.createElement(DurinnGame,{hot:d||{}}))}var h=window.claude&&window.claude.hot;if(h&&h.ready)h.ready(start);else start((h&&h.data)||{});})();`;
@@ -35,7 +39,7 @@ const meta = `<!doctype html>
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="description" content="Unwoven: A Tale of Talvora. Acts One and Two playtest build.">
+<meta name="description" content="Unwoven: A Tale of Talvora. Acts One to Three playtest build.">
 <meta name="apple-mobile-web-app-title" content="Unwoven">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">

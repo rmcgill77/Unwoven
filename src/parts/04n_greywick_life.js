@@ -169,7 +169,7 @@ QUEST_HOOKS.marchguard = (c) => qs(c.G, "q_watch") === 1 && isNightT(c.G.time)
 
 /* ---------- the task list in Greywick ---------- */
 ASH_QUESTS.push(
-  ["q_keystone", "A Keystone for Greywick", ["", "Bring a Pillar Keystone from Fort Frostcrown"], ["", "The Fort's storehouse (the Fort opens in a later build)"]],
+  ["q_keystone", "A Keystone for Greywick", ["", "Bring a Pillar Keystone from Fort Frostcrown"], ["", "The Fort's storehouse, north past the Outskirts"]],
   ["q_iron", "The Iron Request", ["", "Bring Ida Flint three pieces of iron scrap"], ["", "The Worn Covenant Construct in the West Forest is made of the stuff"]],
   ["q_ledgers", "Boarded Chapel Ledgers", ["", "Fetch the ledgers from Greywick's boarded chapel"], ["", "A loose board at the back of the chapel, on the west side"]],
   ["q_watch", "Watch the Road", ["", "Count the Covenant patrols at the boundary stone, after dark", "Tell Tam what you saw"], ["", "The Frost Road, north-east of Greywick", "The fallen watchtower in Greywick, after dark"]],

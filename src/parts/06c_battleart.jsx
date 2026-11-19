@@ -232,9 +232,25 @@ function battleSceneFor(mapId, tx, ty) {
   if (mapId === "fort") return "castle";
   if (mapId === "os") return tx < 22 && ty < 20 ? "rocks" : tx > 70 && ty < 30 ? "frostlake" : "snowwood";
   if (mapId === "gw") return "snowwood";
+  if (def.cave || def.terrain === "cave") {                                     // under the ground: the cave backdrops
+    if (mapId === "cr_shrine" || mapId === "caveS") return "crystalcave";            // word-light, moon-light
+    if (mapId === "au_culvert" || mapId === "rot_cellar" || mapId === "caveD") return "spidercave";   // slime, webs, the infection
+    return "cave";
+  }
   const sn = snowAtTile(def, ty);
+  if (def.crags) return sn > 0.5 ? "snowfield" : sn > 0.15 ? "snowwood" : "rocks";   // the Western Crags
+  const treesNear = () => { let n = 0; for (let y = ty - 3; y <= ty + 3; y++) for (let x = tx - 3; x <= tx + 3; x++) { const r = def.rows[y]; if (r && r[x] === "T") n++; } return n > 10; };
+  if (def.south) {                                                                 // southern Etharis: fields gone to autumn, woods, and where the curse runs, dead ground
+    if (typeof curseAtTile === "function" && curseAtTile(def, tx, ty) > 0.38) return "cursed";
+    if (def.town) return mapId === "rot" ? "cursed" : "autumnfield";
+    return treesNear() ? "summerwood" : "autumnfield";
+  }
+  if (mapId === "rot" || mapId === "au_out" || mapId === "au_vault" || mapId === "sb" || mapId === "mh" || mapId.startsWith("ver_")) return mapId === "rot" ? "cursed" : "autumnfield";
+  if (mapId === "rocks") return "canyon";                                           // Act One's southern rocks
+  if (mapId === "wood" || mapId === "ruin" || mapId === "grove" || mapId === "wforest" || mapId === "eforest") return "summerwood";
   if (def.plains && sn > 0.5) return "snowfield";
   if (def.plains && sn > 0.25) return "birch";
+  if (def.plains) return "summerwood";
   return null;
 }
 function drawBattleBackdrop(w, h) {
@@ -359,6 +375,31 @@ const EL_COL = { fire: ["#ffb040", "#ff6a30", "#fff0c0"], cold: ["#bfe8ff", "#7a
   storm: ["#fff6a0", "#a8c8ff", "#ffffff"], light: ["#fff8d0", "#ffe890", "#ffffff"], force: ["#c8a8ff", "#8a6adf", "#e8dcff"], life: ["#a8e07a", "#e0ffc8", "#7ad08a"],
   growth: ["#7ac060", "#a8e07a", "#4a8a40"], mind: ["#a8c8ff", "#e0d0ff", "#ffffff"] };
 const FOE_ART = new Map();
+/* V93: a little face for the turn-order strip, and the status icons a fighter carries */
+const BTL_CHIP = {};
+function btlChip(u) {
+  const key = u.side + ":" + u.key; if (BTL_CHIP[key]) return BTL_CHIP[key];
+  let url = "";
+  try {
+    if (u.side === "p") url = getPortrait(u.look || { chibi: u.key === "companion" ? "companion" : (CHIBI_MAP[u.key] || u.key) }).toDataURL();
+    else { const fr = foeSprite(u), im = (fr.idle && fr.idle[0]) || fr[0]; if (im) { const c = makeCanvas(im.width, im.height); c.getContext("2d").drawImage(im, 0, 0); url = c.toDataURL(); } }
+  } catch (e) { url = ""; }
+  return (BTL_CHIP[key] = url);
+}
+function btlStatusIcons(u, B) {
+  if (u.ko) return [];
+  const o = [];
+  if (u.stunT > B.t) o.push(["✶", "#b08a2a", "Stunned"]);
+  if (u.sleepT > B.t) o.push(["z", "#4a5a9a", "Asleep"]);
+  if (u.slowT > B.t) o.push(["≈", "#2a6a7a", "Slowed"]);
+  if (u.markT > B.t) o.push(["◎", "#9a3a3a", "Marked"]);
+  if (u.dot) o.push([u.dot.k === "poison" ? "☠" : "♨", u.dot.k === "poison" ? "#5a7a2a" : "#a04a20", u.dot.k === "poison" ? "Poisoned" : "Burning"]);
+  if (u.prot > 0 || u.guard) o.push(["⛨", "#3a6a8a", "Guarding"]);
+  if (u.ward > 0) o.push(["◇", "#4a7aa8", "Warded"]);
+  if (u.infuse) o.push(["✦", "#8a6a2a", "Infused"]);
+  if (u.charging) o.push(["!", "#a8501c", "Winding up"]);
+  return o.slice(0, 4);
+}
 function foeSprite(u) {
   if (FOE_FR[u.art]) return FOE_FR[u.art];
   const k = u.art + (u.tint || 0);
@@ -393,7 +434,7 @@ function BattleScreen({ G, foes, party, magic, settings = {}, canFlee = true, pr
   const [over, setOver] = useState(null);                 // result card
   const menuRef = useRef(null); menuRef.current = menu;
   const hover = useRef(null);
-  const refs = useRef({ foeCond: {}, foeHp: {}, foeBadge: {}, hp: {}, mp: {}, atb: {}, hpBar: {}, row: {}, ward: {}, log: null });
+  const refs = useRef({ foeCond: {}, foeHp: {}, foeBadge: {}, hp: {}, mp: {}, atb: {}, hpBar: {}, row: {}, ward: {}, log: null, foePlate: {}, foeTop: {}, foeSt: {}, heroSt: {}, order: null, orderKey: "", orderT: 0 });
   const doneRef = useRef(false);
   const hitRef = useRef(null);
   const [tip, setTip] = useState(() => (magic && !(G.flags && G.flags.tip_btl) ? 1 : !(G.flags && G.flags.tip_btl0) && !practice ? 0 : null));
@@ -520,9 +561,9 @@ function BattleScreen({ G, foes, party, magic, settings = {}, canFlee = true, pr
         if (typeof battleSfx === "function") battleSfx(e, u);
         const [px, py] = pose(u, w, h), top = py - (u.side === "p" ? 56 : 40 * (u.scale || 1));
         if (e.e === "dmg") {
-          floaters.push({ x: px, y: top, text: String(e.amt) + (e.weak ? "!" : ""), col: u.side === "p" ? "#ff9a8a" : e.weak ? "#ffb060" : e.kind === "magic" ? "#ffe08a" : "#fff0c0", t: 0 });
-          if (e.weak) floaters.push({ x: px, y: top + 10, text: "Weak", col: "#ffb060", t: 0, small: true });
-          else if (e.resist) floaters.push({ x: px, y: top + 10, text: "Resists", col: "#9cb0c8", t: 0, small: true });
+          floaters.push({ x: px, y: top - 6, text: String(e.amt) + (e.weak ? "!" : ""), col: u.side === "p" ? "#ff9a8a" : e.weak ? "#ffb060" : e.kind === "magic" ? "#ffe08a" : "#fff0c0", t: 0, big: !!e.weak });
+          if (e.weak) floaters.push({ x: px, y: top + 16, text: "Weak spot", col: "#ffd060", t: 0, small: true });
+          else if (e.resist) floaters.push({ x: px, y: top + 16, text: "Resists", col: "#9cb0c8", t: 0, small: true });
           burst(px, top + 14, e.kind === "magic" ? 20 : 12, e.kind === "magic" && EL_COL[e.el] ? EL_COL[e.el] : [PAL.fireL, PAL.white], 1);
           if (u.side === "p") { shake.t = 0.25; shake.a = 3; } else if (u.hp <= 0) { shake.t = 0.18; shake.a = 2; }
         } else if (e.e === "heal") {
@@ -602,6 +643,7 @@ function BattleScreen({ G, foes, party, magic, settings = {}, canFlee = true, pr
         }
       }
       items.sort((a, b) => a.y - b.y);
+      for (const it of items) if (it.u.side === "e") refs.current.foeTop[it.u.id] = [it.sx, it.yy];
       for (const it of items) { const u = it.u; if (u.side === "p") shadow(it.sx - 3, it.y, u.ko ? 18 : 15); else if (!(u.ko && u.anim.t > 0.8)) shadow(it.sx, it.y + 1, it.img.width * it.sc * 0.4); }
       for (const it of items) {
         const u = it.u;
@@ -688,7 +730,10 @@ function BattleScreen({ G, foes, party, magic, settings = {}, canFlee = true, pr
       }
       for (let i = parts.length - 1; i >= 0; i--) { const p = parts[i]; p.life -= dt; if (p.life <= 0) { parts.splice(i, 1); continue; } p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 40 * dt; ctx.globalAlpha = Math.max(0, p.life / p.max); ctx.fillStyle = p.c; ctx.fillRect(Math.round(p.x), Math.round(p.y), 2, 2); }
       ctx.globalAlpha = 1;
-      for (let i = floaters.length - 1; i >= 0; i--) { const f = floaters[i]; f.t += dt; if (f.t > 1.1) { floaters.splice(i, 1); continue; } ctx.globalAlpha = Math.min(1, (1.1 - f.t) * 2.2); drawText(ctx, f.text, Math.round(f.x), Math.round(f.y - f.t * 22), f.col, f.small ? 1 : 2, "center", "#2a1018"); }
+      for (let i = floaters.length - 1; i >= 0; i--) { const f = floaters[i]; f.t += dt; if (f.t > 1.1) { floaters.splice(i, 1); continue; } ctx.globalAlpha = Math.min(1, (1.1 - f.t) * 2.2);
+        const sc = f.small ? 1 : f.big ? 4 : 3, pop = f.small ? 0 : Math.max(0, 0.12 - f.t) * 40, fx = Math.round(f.x), fy = Math.round(f.y - f.t * 22 - pop);
+        if (!f.small) for (const [ox, oy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]]) drawText(ctx, f.text, fx + ox * 2, fy + oy * 2, "#140c14", sc, "center", null);   // an ink outline all round
+        drawText(ctx, f.text, fx, fy, f.col, sc, "center", f.small ? "#2a1018" : null); }
       ctx.globalAlpha = 1;
       for (let i = 0; i < 3; i++) {
         const mx = ((t * (3 + i * 2) + i * 130) % (w + 200)) - 200, my = h * (0.5 + i * 0.12);
@@ -719,6 +764,36 @@ function BattleScreen({ G, foes, party, magic, settings = {}, canFlee = true, pr
         }
       }
       if (R.log) { const txt = t - logT < 5 ? logLines.join("  |  ") : ""; if (R.log.textContent !== txt) R.log.textContent = txt; }
+      /* V93: who acts next, the foes' plates over their heads, and status icons */
+      if (t - R.orderT > 0.2) {
+        R.orderT = t;
+        const est = B.units.filter((u) => !u.ko).map((u) => {
+          if (u.act || u.queued || u.cast) return [-1, u];
+          const rate = Math.max(0.01, (u.spd || 1) * BTL.RATE * (u.slowT > B.t ? 0.5 : 1) * (u.side === "e" ? BTL.FOE_SLOW : 1));
+          let tt = u.gauge >= 100 ? 0 : (100 - u.gauge) / rate; if (u.stunT > B.t) tt += u.stunT - B.t; if (u.sleepT > B.t) tt += u.sleepT - B.t;
+          return [tt, u];
+        }).sort((a, b) => a[0] - b[0]).slice(0, 6);
+        const key = est.map((x) => x[1].id).join(",");
+        if (R.order && key !== R.orderKey) { R.orderKey = key; R.order.innerHTML = '<span class="bo-lb">Next</span>' + est.map(([, u], i) => `<i class="bo-chip" data-side="${u.side}" data-now="${i === 0 ? 1 : 0}" title="${u.name || ""}" style="background-image:url(${btlChip(u)})"></i>`).join(""); }
+        for (const u of B.units) {
+          const icons = btlStatusIcons(u, B), html = icons.map(([g, c, tl]) => `<b style="background:${c}" title="${tl}">${g}</b>`).join("");
+          const el = u.side === "e" ? R.foeSt[u.id] : R.heroSt[u.id];
+          if (el && el.dataset.k !== html) { el.dataset.k = html; el.innerHTML = html; }
+        }
+      }
+      { const cvE = cvRef.current, kx = cvE ? cvE.clientWidth / w : 1, placed = [];
+        if (cvE) for (const u of [...B.units].filter((x) => x.side === "e").sort((p, q) => (R.foeTop[q.id] || [0, 0])[1] - (R.foeTop[p.id] || [0, 0])[1])) {
+          const pl = R.foePlate[u.id], at = R.foeTop[u.id]; if (!pl || !at) continue;
+          const pw = pl.offsetWidth, ph = pl.offsetHeight;
+          let lx = Math.round(cvE.offsetLeft + at[0] * kx - pw / 2), ly = Math.round(cvE.offsetTop + at[1] * kx - ph - 4);
+          lx = Math.max(4, Math.min(cvE.offsetLeft + cvE.clientWidth - pw - 4, lx)); ly = Math.max(58, ly);
+          for (let pass = 0; pass < 4; pass++) {   // plates that would cover each other stack upward instead
+            const hit = placed.find((o) => lx < o[0] + o[2] + 3 && o[0] < lx + pw + 3 && ly < o[1] + o[3] + 3 && o[1] < ly + ph + 3);
+            if (!hit) break; ly = hit[1] - ph - 4; if (ly < 58) { ly = 58; lx = hit[0] + hit[2] + 6; }
+          }
+          placed.push([lx, ly, pw, ph]);
+          const L = lx + "px", T = ly + "px"; if (pl.style.left !== L) pl.style.left = L; if (pl.style.top !== T) pl.style.top = T;
+        } }
       raf = requestAnimationFrame(frame);
     };
     raf = requestAnimationFrame(frame);
@@ -747,10 +822,11 @@ function BattleScreen({ G, foes, party, magic, settings = {}, canFlee = true, pr
   return (
     <div className="dz-battle" role="dialog" aria-label="Battle">
       <div className="dz-bstage" ref={boxRef}><canvas ref={cvRef} className="dz-bcv" onPointerDown={onStageTap} /></div>
-      <div className="dz-btop dz-frame">
+      <div className="dz-border dz-frame" aria-label="Turn order" style={over ? { display: "none" } : undefined} ref={(el) => { refs.current.order = el; }} />
+      <div className="dz-btop nb" style={over ? { display: "none" } : undefined}>
         {foeUnits.map((u) => (
-          <div className="dz-bfoe" key={u.id} data-ko="0" data-read={B.act2 ? "0" : "1"} data-veil={B.act2 ? "1" : "0"}>
-            <b>{u.name}</b><span>Lv {u.lv}</span><em className="dz-bbadge" ref={(el) => { refs.current.foeBadge[u.id] = el; }} />
+          <div className="dz-bfoe dz-frame" key={u.id} data-ko="0" data-read={B.act2 ? "0" : "1"} data-veil={B.act2 ? "1" : "0"} ref={(el) => { refs.current.foePlate[u.id] = el; }}>
+            <b>{u.name}</b><span>Lv {u.lv}</span><span className="dz-bst" ref={(el) => { refs.current.foeSt[u.id] = el; }} /><em className="dz-bbadge" ref={(el) => { refs.current.foeBadge[u.id] = el; }} />
             {B.act2 ? <em className="dz-bcond" ref={(el) => { refs.current.foeCond[u.id] = el; }}>Unhurt</em> : null}
             <div className="dz-bhp"><i ref={(el) => { refs.current.foeHp[u.id] = el; }} style={{ width: "100%" }} /></div>
           </div>
@@ -771,13 +847,13 @@ function BattleScreen({ G, foes, party, magic, settings = {}, canFlee = true, pr
           {menu && menu.stage === "cmd" ? (
             <>
               <div className="dz-bwho">{mu ? mu.name : ""} <i>· tap an enemy to attack it</i></div>
-              <button className="dz-bc" id="dz-c-attack" onClick={() => pickCmd("attack")}>Attack</button>
+              <button className="dz-bc" id="dz-c-attack" data-g="⚔" onClick={() => pickCmd("attack")}>Attack</button>
               {mu && btlCaster(mu.key)
-                ? <button className="dz-bc" id="dz-c-magic" disabled={!magic || !known.length} onClick={() => pickCmd("magic")}>Cast</button>
-                : <button className="dz-bc" id="dz-c-skill" disabled={!(mu && (BTL_ABILITIES[mu.key] || []).length)} onClick={() => pickCmd("skill")}>Abilities</button>}
-              <button className="dz-bc" id="dz-c-item" disabled={!itemList.length} onClick={() => pickCmd("item")}>Item</button>
-              <button className="dz-bc" id="dz-c-defend" onClick={() => pickCmd("defend")}>Defend</button>
-              <button className="dz-bc" id="dz-c-flee" disabled={!canFlee} onClick={() => pickCmd("flee")}>Flee</button>
+                ? <button className="dz-bc" id="dz-c-magic" data-g="✦" disabled={!magic || !known.length} onClick={() => pickCmd("magic")}>Cast</button>
+                : <button className="dz-bc" id="dz-c-skill" data-g="✦" disabled={!(mu && (BTL_ABILITIES[mu.key] || []).length)} onClick={() => pickCmd("skill")}>Abilities</button>}
+              <button className="dz-bc" id="dz-c-item" data-g="⚗" disabled={!itemList.length} onClick={() => pickCmd("item")}>Item</button>
+              <button className="dz-bc" id="dz-c-defend" data-g="⛨" onClick={() => pickCmd("defend")}>Defend</button>
+              <button className="dz-bc" id="dz-c-flee" data-g="↶" disabled={!canFlee} onClick={() => pickCmd("flee")}>Flee</button>
             </>
           ) : null}
           {menu && menu.stage === "skill" && mu ? (
@@ -835,7 +911,7 @@ function BattleScreen({ G, foes, party, magic, settings = {}, canFlee = true, pr
                 <div className="dz-bname"><b>{u.name}</b><small>Lv {u.lv}</small><span ref={(el) => { refs.current.hp[u.id] = el; }}>{u.hp}/{u.maxHp}</span></div>
                 <div className="dz-bhp"><i ref={(el) => { refs.current.hpBar[u.id] = el; }} data-low="0" /></div>
                 <div className="dz-batb"><i ref={(el) => { refs.current.atb[u.id] = el; }} /></div>
-                <div className="dz-bmp" ref={(el) => { refs.current.mp[u.id] = el; }} />
+                <div className="dz-bmp" ref={(el) => { refs.current.mp[u.id] = el; }} /><span className="dz-bst" ref={(el) => { refs.current.heroSt[u.id] = el; }} />
               </div>
             </div>
           ))}
@@ -860,12 +936,29 @@ function BattleScreen({ G, foes, party, magic, settings = {}, canFlee = true, pr
         <div className="dz-mgover" id="dz-bover">
           <div className="dz-mgcard dz-frame" style={{ padding: "18px 22px" }}>
             {over.res.phase === "won" ? (
-              <>
-                <div className="dz-ptitle">Victory</div>
-                <div className="dz-reward"><span>+{over.res.xp} XP</span>{over.res.coins ? <span>+{over.res.coins} coppers</span> : null}</div>
-                {Object.keys(over.res.loot).map((k) => <div key={k}>Found: {over.res.loot[k] > 1 ? over.res.loot[k] + " × " : ""}{BTL_ITEMS[k] ? BTL_ITEMS[k].name : ITEMS[k] ? ITEMS[k].name : k}</div>)}
-                {over.ups.map((u, i) => <div key={i} className="dz-lvup">{(u.key === "wren" && G && G.name) || BTL_PARTY[u.key].name} reached level {u.lv}</div>)}
-              </>
+              <div className="bv">
+                <div className="dz-ptitle bv-h">Victory</div>
+                <div className="bv-sub">{foeUnits.length === 1 ? foeUnits[0].name + " beaten" : foeUnits.length + " foes beaten"}</div>
+                <div className="dz-reward" style={{ display: "none" }}><span>+{over.res.xp} XP</span>{over.res.coins ? <span>+{over.res.coins} coppers</span> : null}</div>
+                <div className="bv-xp">
+                  {heroes.map((u) => {
+                    const r = G.party && G.party[u.key], up = over.ups.filter((x) => x.key === u.key).pop(), mem = (over.res.members || []).find((m) => m.key === u.key), down = mem && mem.ko;
+                    const need = r && typeof BTL_XP_FOR === "function" ? BTL_XP_FOR(r.lv) : 0, k = r && need ? Math.min(1, r.xp / need) : 0;
+                    return <div className="bv-row" key={u.id}>
+                      <div className="bv-face"><PixelImage source={getPortrait(u.look || { chibi: u.key === "companion" ? "companion" : (CHIBI_MAP[u.key] || u.key) })} scale={0.62} /></div>
+                      <span className="bv-n">{u.name}</span>
+                      <div className="bv-bar"><i style={{ width: Math.round(k * 100) + "%" }} data-up={up ? "1" : "0"} /></div>
+                      <span className="bv-v" data-up={up ? "1" : "0"}>{down ? "down" : up ? `Level ${up.lv}!` : `+${Math.round(over.res.xp / Math.max(1, (over.res.members || []).filter((m) => !m.ko).length))} xp`}</span>
+                    </div>;
+                  })}
+                </div>
+                <div className="bv-loot">
+                  {Object.keys(over.res.loot).map((k) => <div className="bv-item" key={k} title={(BTL_ITEMS[k] || ITEMS[k] || { name: k }).name}><ItemIcon id={k} size={32} /><span>{over.res.loot[k] > 1 ? over.res.loot[k] + " × " : ""}{BTL_ITEMS[k] ? BTL_ITEMS[k].name : ITEMS[k] ? ITEMS[k].name : k}</span></div>)}
+                  {over.res.coins ? <div className="bv-item" data-k="coin"><b>◉</b><span>{over.res.coins} coppers</span></div> : null}
+                  {!Object.keys(over.res.loot).length && !over.res.coins ? <div className="bv-none">Nothing worth taking.</div> : null}
+                </div>
+                {over.ups.map((u, i) => <div key={i} className="dz-lvup" style={{ display: "none" }}>{(u.key === "wren" && G && G.name) || BTL_PARTY[u.key].name} reached level {u.lv}</div>)}
+              </div>
             ) : (
               <>
                 <div className="dz-ptitle">You fall</div>

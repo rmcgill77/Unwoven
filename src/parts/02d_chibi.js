@@ -22,7 +22,7 @@ function loadChibi() {
   keys.forEach((k) => { left += CHIBI_DATA.chars[k].roles ? 2 : 1; });
   bkeys.forEach((k) => { left += BATTLE_DATA.chars[k].roles ? 2 : 1; });
   const done = () => { if (--left === 0) { CHIBI.ready = true; try { PORTRAIT_CACHE.clear(); } catch (e) { /* ignore */ } CHIBI.cbs.splice(0).forEach((f) => f()); } };
-  const img = (b64, cb) => { const im = new Image(); im.onload = () => { cb(im); done(); }; im.src = "data:image/png;base64," + b64; };
+  const img = (b64, cb) => { const im = new Image(); im.onload = () => { cb(im); done(); }; im.src = (b64.startsWith("UklGR") ? "data:image/webp;base64," : "data:image/png;base64,") + b64; };
   keys.forEach((k) => {
     const d = CHIBI_DATA.chars[k];
     img(d.png, (im) => { CHIBI.sets[k] = chibiSlice(im, d); CHIBI.imgs[k] = im; });
@@ -173,6 +173,7 @@ function swordSet(set) {
 }
 function battleFor(key, look, weapon) {
   if (!CHIBI.ready) return null;
+  if ((key === "corin" || key === "elowyn") && typeof COMP_LOOK !== "undefined") return battleFor("wren", COMP_LOOK[key], weapon);   // the hero not chosen fights in a hero's own frames
   if (key !== "wren") return CHIBI.battle[key] || null;
   const k = pLookKey(look);
   let s = PLAYER_BATTLE.get(k);
